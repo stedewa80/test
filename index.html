@@ -1,1 +1,52 @@
-Test
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corner Time Monitor Pro</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <h1>Corner Time Monitor Pro</h1>
+        
+        <div class="video-box">
+            <video id="webcam" autoplay playsinline muted></video>
+            <canvas id="motion-canvas"></canvas>
+            <div id="warning-overlay" class="hidden">BEWEGUNG ERKANNT!</div>
+        </div>
+
+        <div class="status-panel">
+            <div id="timer-display">05:00</div>
+            <div id="status-text">Bereit zum Start</div>
+            <div id="task-display" class="task-box hidden">Aktuelle Aufgabe: Keine</div>
+        </div>
+
+        <div class="settings">
+            <label>Dauer (Minuten): 
+                <input type="number" id="duration-input" value="5" min="1" max="120">
+            </label>
+            <label>Empfindlichkeit: 
+                <input type="range" id="sensitivity-input" min="10" max="90" value="40">
+            </label>
+            <label>Zufallsaufgaben aktivieren: 
+                <input type="checkbox" id="tasks-checkbox" checked>
+            </label>
+        </div>
+
+        <div class="controls">
+            <button id="start-btn">Sitzung starten</button>
+            <button id="stop-btn" class="danger-btn" disabled>Abbrechen</button>
+        </div>
+
+        <!-- Neuer Statistik-Bereich -->
+        <div id="report-panel" class="report-box hidden">
+            <h3>Sitzungsbericht</h3>
+            <p>Erkannte Bewegungen: <span id="report-violations" class="stat-val">0</span></p>
+            <p>Erhaltener Strafen-Timer: <span id="report-penalty" class="stat-val">0s</span></p>
+            <p>Erledigte Zusatzaufgaben: <span id="report-tasks" class="stat-val">0</span></p>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
