@@ -1,0 +1,43 @@
+/* Bestehende Stile beibehalten und folgendes unten anhängen: */
+
+.task-box {
+    background-color: #3a3f44;
+    border-left: 4px solid #ffc107;
+    padding: 10px;
+    margin: 15px 0;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #ffc107;
+}
+
+.report-box {
+    margin-top: 25px;
+    padding: 15px;
+    background-color: #222;
+    border-radius: 8px;
+    border: 1px solid #444;
+    text-align: left;
+}
+
+.report-box h3 {
+    margin-top: 0;
+    color: #007bff;
+    border-bottom: 1px solid #444;
+    padding-bottom: 5px;
+}
+
+.report-box p {
+    margin: 8px 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+.stat-val {
+    font-weight: bold;
+    color: #28a745;
+}
+
+#report-penalty {
+    color: #dc3545;
+}
