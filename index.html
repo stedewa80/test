@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Visual Guardian</title>
+    <title>CornerTime - Visual Guardian Fixed</title>
     <style>
         body {
             background-color: #121212;
@@ -22,7 +22,6 @@
         .timer-display { font-size: 5rem; font-weight: bold; font-variant-numeric: tabular-nums; margin: 10px 0; transition: color 0.2s; }
         .status-message { font-size: 1.2rem; color: #aaaaaa; margin-bottom: 20px; min-height: 3.5rem; display: flex; align-items: center; justify-content: center; padding: 0 10px; }
         
-        /* Kamera-Box mit relativer Positionierung für das Overlay */
         .camera-box { 
             width: 100%; 
             border-radius: 20px; 
@@ -40,15 +39,15 @@
         
         video { display: block; width: 100%; height: auto; transform: scaleX(-1); }
         
-        /* Das Zeichenbrett liegt exakt über dem Video */
         canvas.overlay-canvas {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            transform: scaleX(-1); /* Ebenfalls spiegeln wie das Video */
-            pointer-events: none; /* Klicks gehen durch das Canvas aufs Video */
+            transform: scaleX(-1); 
+            pointer-events: none; 
+            z-index: 10; /* Zwingt das Zeichenbrett über die Videoschicht */
         }
 
         .setup-screen { background: #1e1e1e; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
@@ -91,7 +90,6 @@
             <div id="timer" class="timer-display">00:00</div>
             <div id="cameraWrapper" class="camera-box">
                 <video id="webcam" autoplay playsinline muted></video>
-                <!-- Neues sichtbares Canvas für die bunten Tracking-Punkte -->
                 <canvas id="skeletonCanvas" class="overlay-canvas"></canvas>
             </div>
         </div>
@@ -153,12 +151,9 @@
                     motionCanvas.height = 30;
                     motionCtx = motionCanvas.getContext('2d');
                     
-                    // Canvas-Overlay-Größe an das Video anpassen
-                    sCanvas.width = 320;
-                    sCanvas.height = 240;
                     sCtx = sCanvas.getContext('2d');
                     
-                    statusText.innerText = "Initializing AI Pose Networks...";
+                    statusText.innerText = "Initializing AI Pose Networks... (Kann auf Handys bis zu 10 Sek. dauern)";
                     poseNetModel = await posenet.load({
                         architecture: 'MobileNetV1',
                         outputStride: 16,
@@ -186,7 +181,6 @@
                 return;
             }
 
-            // 1. UMGEBUNGS-BEWEGUNG (Pixel)
             let movementDetected = checkMotion();
             if (movementDetected) {
                 timeLeftInSeconds += penaltySeconds;
@@ -197,13 +191,21 @@
                 resetAlertStatus();
             }
 
-            // 2. SKELETT-CHECK & ZEICHNEN
             if (poseNetModel && video.readyState >= 2) {
                 try {
                     const pose = await poseNetModel.estimateSinglePose(video, { flipHorizontal: true });
                     
-                    // Altes Skelett-Bild löschen, um neu zu zeichnen
+                    // --- FIX: LEINWAND AN DIE ECHTE DISPLAY-GRÖSSE ANPASSEN ---
+                    if (sCanvas.width !== video.clientWidth || sCanvas.height !== video.clientHeight) {
+                        sCanvas.width = video.clientWidth;
+                        sCanvas.height = video.clientHeight;
+                    }
+
                     if (sCtx) sCtx.clearRect(0, 0, sCanvas.width, sCanvas.height);
+
+                    // Skalierungsfaktoren berechnen, um KI-Koordinaten auf Bildschirmgröße umzurechnen
+                    const scaleX = sCanvas.width / 320;
+                    const scaleY = sCanvas.height / 240;
 
                     const leftShoulder = pose.keypoints.find(k => k.part === 'leftShoulder');
                     const rightShoulder = pose.keypoints.find(k => k.part === 'rightShoulder');
@@ -212,22 +214,23 @@
                     const leftWrist = pose.keypoints.find(k => k.part === 'leftWrist');
                     const rightWrist = pose.keypoints.find(k => k.part === 'rightWrist');
 
-                    // --- LIVE-PUNKTE ZEICHNEN ---
+                    // --- LIVE-PUNKTE SKALIERT ZEICHNEN ---
                     if (sCtx) {
                         const partsToDraw = [leftShoulder, rightShoulder, leftEar, rightEar, leftWrist, rightWrist];
                         partsToDraw.forEach(part => {
                             if (part && part.score > 0.3) {
                                 sCtx.beginPath();
-                                sCtx.arc(part.position.x, part.position.y, 6, 0, 2 * Math.PI);
+                                // Umrechnung auf die echten Display-Pixel deines Handys
+                                const drawX = part.position.x * scaleX;
+                                const drawY = part.position.y * scaleY;
                                 
-                                // Hände werden blau markiert, Schultern/Ohren grün
+                                sCtx.arc(drawX, drawY, 8, 0, 2 * Math.PI);
                                 sCtx.fillStyle = (part.part.includes('Wrist')) ? '#3399ff' : '#00ffcc';
                                 sCtx.fill();
                             }
                         });
                     }
 
-                    // Regel-Auswertung nur fortsetzen, wenn keine Bewegung vorliegt
                     if (!movementDetected) {
                         // --- ANTI-CHEAT ---
                         if (leftShoulder.score < 0.25 || rightShoulder.score < 0.25) {
@@ -245,7 +248,7 @@
                             
                             const shoulderLineY = (leftShoulder.position.y + rightShoulder.position.y) / 2;
 
-                            // --- REGELLAYER 2: HÄNDE UNTEN CHECK ---
+                            // --- HÄNDE UNTEN CHECK ---
                             let handsDropped = false;
                             const handThresholdY = (headY !== null) ? headY : (shoulderLineY - 30);
 
@@ -260,7 +263,7 @@
                                 timerDisplay.style.color = "#3399ff";
                                 resetAlertStatus();
                             } 
-                            // --- REGELLAYER 3: KÖRPERHALTUNG ---
+                            // --- KÖRPERHALTUNG ---
                             else {
                                 const shoulderTilt = Math.abs(leftShoulder.position.y - rightShoulder.position.y);
                                 let isSlouching = false;
