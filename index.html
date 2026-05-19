@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Wall Position Guardian</title>
+    <title>CornerTime - Anti-Cheat Guardian</title>
     <style>
         body {
             background-color: #121212;
@@ -23,7 +23,7 @@
         .status-message { font-size: 1.2rem; color: #aaaaaa; margin-bottom: 20px; min-height: 3.5rem; display: flex; align-items: center; justify-content: center; padding: 0 10px; }
         .camera-box { width: 100%; border-radius: 20px; border: 8px solid #333333; overflow: hidden; background: #000000; position: relative; transition: border-color 0.2s, box-shadow 0.2s; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         
-        /* Verschiedene visuelle Warnungen je nach Vergehen */
+        /* Visuelle Warnfarben */
         .camera-box.motion-violation { border-color: #ff3333 !important; box-shadow: 0 0 35px rgba(255, 51, 51, 0.7); }
         .camera-box.posture-violation { border-color: #ffaa00 !important; box-shadow: 0 0 35px rgba(255, 170, 0, 0.7); }
         .camera-box.hands-violation { border-color: #3399ff !important; box-shadow: 0 0 35px rgba(51, 153, 255, 0.7); }
@@ -35,22 +35,21 @@
         label { display: block; margin-bottom: 8px; color: #ccc; }
     </style>
 
-    <!-- Skripte für KI-Skeletterkennung -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
 </head>
 <body>
 
     <div class="app-container">
-        <!-- SETUP EINRICHTUNG -->
+        <!-- SETUP SCREEN -->
         <div id="setupScreen" class="setup-screen">
-            <h2 style="margin-top:0;">CornerTime Multi-Guard</h2>
+            <h2 style="margin-top:0;">CornerTime Secure Guardian</h2>
             <div style="margin-bottom: 12px;">
                 <label for="durationInput">Wall Time (Minutes):</label>
                 <input type="number" id="durationInput" value="5" min="1">
             </div>
             <div style="margin-bottom: 12px;">
-                <label for="penaltyInput">Motion Penalty (Seconds):</label>
+                <label for="penaltyInput">Motion / Cheat Penalty (Seconds):</label>
                 <input type="number" id="penaltyInput" value="15" min="1">
             </div>
             <div style="margin-bottom: 12px;">
@@ -88,7 +87,7 @@
         let handsPenaltySeconds = 10;
         
         let isPrepared = false;
-        let prepCountdown = 15; // 15 Sekunden Zeit, um die Hände an die Wand zu nehmen
+        let prepCountdown = 15; 
         let appInterval = null;
 
         let poseNetModel = null;
@@ -156,8 +155,8 @@
                 return;
             }
 
-            // REGELLAYER 1: UMGEBUNGS-BEWEGUNG (Pixel)
-            const movementDetected = checkMotion();
+            // 1. UMGEBUNGS-BEWEGUNG (Pixel)
+            let movementDetected = checkMotion();
             if (movementDetected) {
                 timeLeftInSeconds += penaltySeconds;
                 wrapper.className = "camera-box motion-violation";
@@ -167,7 +166,7 @@
                 resetAlertStatus();
             }
 
-            // REGELLAYER 2 & 3: SKELETT-CHECK (PoseNet)
+            // 2. SKELETT-CHECK & ANTI-CHEAT (PoseNet)
             if (!movementDetected && poseNetModel && video.readyState >= 2) {
                 try {
                     const pose = await poseNetModel.estimateSinglePose(video, { flipHorizontal: true });
@@ -179,24 +178,26 @@
                     const leftWrist = pose.keypoints.find(k => k.part === 'leftWrist');
                     const rightWrist = pose.keypoints.find(k => k.part === 'rightWrist');
 
-                    // Kopfreferenz bestimmen (Ohr-Positionen nutzen)
-                    const headReferenceY = (leftEar.score > 0.4) ? leftEar.position.y : ((rightEar.score > 0.4) ? rightEar.position.y : null);
+                    // --- ANTI-CHEAT: PRÜFEN OB JEMAND IM BILD IST ---
+                    // Wenn die KI die Schultern überhaupt nicht mit ausreichender Sicherheit sieht
+                    if (leftShoulder.score < 0.25 || rightShoulder.score < 0.25) {
+                        timeLeftInSeconds += penaltySeconds; // Bestrafung wie bei Bewegung
+                        wrapper.className = "camera-box motion-violation";
+                        statusText.innerText = `ANTI-CHEAT: NO PERSON DETECTED! Get back to the wall! +${penaltySeconds}s`;
+                        statusText.style.color = "#ff3333";
+                        timerDisplay.style.color = "#ff3333";
+                        resetAlertStatus();
+                    } 
+                    // Wenn jemand da ist, fahre mit normalen Haltungs-Regeln fort
+                    else {
+                        const headReferenceY = (leftEar.score > 0.4) ? leftEar.position.y : ((rightEar.score > 0.4) ? rightEar.position.y : null);
 
-                    if (leftShoulder.score > 0.5 && rightShoulder.score > 0.5) {
-                        
-                        // --- REGELLAYER 2: HÄNDE UNTEN CHECK ---
+                        // --- HÄNDE UNTEN CHECK ---
                         let handsDropped = false;
-                        
-                        // Wenn das Handgelenk weiter unten im Bild ist (größerer Y-Wert) als die Ohrhöhe/Kopfhöhe
                         if (headReferenceY !== null) {
-                            if (leftWrist.score > 0.4 && leftWrist.position.y > headReferenceY) {
-                                handsDropped = true;
-                            }
-                            if (rightWrist.score > 0.4 && rightWrist.position.y > headReferenceY) {
-                                handsDropped = true;
-                            }
+                            if (leftWrist.score > 0.4 && leftWrist.position.y > headReferenceY) handsDropped = true;
+                            if (rightWrist.score > 0.4 && rightWrist.position.y > headReferenceY) handsDropped = true;
                         } else {
-                            // Backup falls Ohren verdeckt sind: Vergleich mit der Schulterlinie
                             if (leftWrist.score > 0.4 && leftWrist.position.y > leftShoulder.position.y) handsDropped = true;
                             if (rightWrist.score > 0.4 && rightWrist.position.y > rightShoulder.position.y) handsDropped = true;
                         }
@@ -209,8 +210,7 @@
                             timerDisplay.style.color = "#3399ff";
                             resetAlertStatus();
                         } 
-                        
-                        // --- REGELLAYER 3: KÖRPERHALTUNG (Zusatz-Check bei sauberen Händen) ---
+                        // --- KÖRPERHALTUNG ---
                         else {
                             const shoulderTilt = Math.abs(leftShoulder.position.y - rightShoulder.position.y);
                             let isSlouching = false;
