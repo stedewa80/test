@@ -3,50 +3,306 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Corner Time Monitor Pro</title>
-    <link rel="stylesheet" href="style.css">
+    <title>CornerTime - Wall Position Guardian</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .app-container { width: 100%; max-width: 500px; text-align: center; }
+        .timer-display { font-size: 5rem; font-weight: bold; font-variant-numeric: tabular-nums; margin: 10px 0; transition: color 0.2s; }
+        .status-message { font-size: 1.2rem; color: #aaaaaa; margin-bottom: 20px; min-height: 3.5rem; display: flex; align-items: center; justify-content: center; padding: 0 10px; }
+        .camera-box { width: 100%; border-radius: 20px; border: 8px solid #333333; overflow: hidden; background: #000000; position: relative; transition: border-color 0.2s, box-shadow 0.2s; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        
+        /* Verschiedene visuelle Warnungen je nach Vergehen */
+        .camera-box.motion-violation { border-color: #ff3333 !important; box-shadow: 0 0 35px rgba(255, 51, 51, 0.7); }
+        .camera-box.posture-violation { border-color: #ffaa00 !important; box-shadow: 0 0 35px rgba(255, 170, 0, 0.7); }
+        .camera-box.hands-violation { border-color: #3399ff !important; box-shadow: 0 0 35px rgba(51, 153, 255, 0.7); }
+        
+        video { display: block; width: 100%; height: auto; transform: scaleX(-1); }
+        .setup-screen { background: #1e1e1e; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
+        button { background: #007aff; color: white; border: none; padding: 15px 30px; font-size: 1.2rem; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 15px; width: 100%; }
+        input { width: 100%; padding: 12px; background: #2a2a2a; border: 2px solid #444; color: white; font-size: 1.2rem; border-radius: 8px; box-sizing: border-box; text-align: center; }
+        label { display: block; margin-bottom: 8px; color: #ccc; }
+    </style>
+
+    <!-- Skripte für KI-Skeletterkennung -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
 </head>
 <body>
+
     <div class="app-container">
-        <h1>Corner Time Monitor Pro</h1>
-        
-        <div class="video-box">
-            <video id="webcam" autoplay playsinline muted></video>
-            <canvas id="motion-canvas"></canvas>
-            <div id="warning-overlay" class="hidden">BEWEGUNG ERKANNT!</div>
+        <!-- SETUP EINRICHTUNG -->
+        <div id="setupScreen" class="setup-screen">
+            <h2 style="margin-top:0;">CornerTime Multi-Guard</h2>
+            <div style="margin-bottom: 12px;">
+                <label for="durationInput">Wall Time (Minutes):</label>
+                <input type="number" id="durationInput" value="5" min="1">
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label for="penaltyInput">Motion Penalty (Seconds):</label>
+                <input type="number" id="penaltyInput" value="15" min="1">
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label for="postureInput">Slouching Penalty (Seconds):</label>
+                <input type="number" id="postureInput" value="5" min="1">
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label for="handsInput">Hands Down Penalty (Seconds):</label>
+                <input type="number" id="handsInput" value="10" min="1">
+            </div>
+            <button onclick="startApp()">Start Monitoring</button>
         </div>
 
-        <div class="status-panel">
-            <div id="timer-display">05:00</div>
-            <div id="status-text">Bereit zum Start</div>
-            <div id="task-display" class="task-box hidden">Aktuelle Aufgabe: Keine</div>
-        </div>
-
-        <div class="settings">
-            <label>Dauer (Minuten): 
-                <input type="number" id="duration-input" value="5" min="1" max="120">
-            </label>
-            <label>Empfindlichkeit: 
-                <input type="range" id="sensitivity-input" min="10" max="90" value="40">
-            </label>
-            <label>Zufallsaufgaben aktivieren: 
-                <input type="checkbox" id="tasks-checkbox" checked>
-            </label>
-        </div>
-
-        <div class="controls">
-            <button id="start-btn">Sitzung starten</button>
-            <button id="stop-btn" class="danger-btn" disabled>Abbrechen</button>
-        </div>
-
-        <!-- Neuer Statistik-Bereich -->
-        <div id="report-panel" class="report-box hidden">
-            <h3>Sitzungsbericht</h3>
-            <p>Erkannte Bewegungen: <span id="report-violations" class="stat-val">0</span></p>
-            <p>Erhaltener Strafen-Timer: <span id="report-penalty" class="stat-val">0s</span></p>
-            <p>Erledigte Zusatzaufgaben: <span id="report-tasks" class="stat-val">0</span></p>
+        <!-- AKTIVE ÜBERWACHUNG -->
+        <div id="activeScreen" style="display: none;">
+            <div id="status" class="status-message">Loading AI Skeleton Tracking...</div>
+            <div id="timer" class="timer-display">00:00</div>
+            <div id="cameraWrapper" class="camera-box">
+                <video id="webcam" autoplay playsinline muted></video>
+            </div>
         </div>
     </div>
-    <script src="script.js"></script>
+
+    <script>
+        const setupScreen = document.getElementById('setupScreen');
+        const activeScreen = document.getElementById('activeScreen');
+        const video = document.getElementById('webcam');
+        const wrapper = document.getElementById('cameraWrapper');
+        const timerDisplay = document.getElementById('timer');
+        const statusText = document.getElementById('status');
+
+        let timeLeftInSeconds = 0;
+        let penaltySeconds = 15;
+        let slouchPenaltySeconds = 5;
+        let handsPenaltySeconds = 10;
+        
+        let isPrepared = false;
+        let prepCountdown = 15; // 15 Sekunden Zeit, um die Hände an die Wand zu nehmen
+        let appInterval = null;
+
+        let poseNetModel = null;
+        let motionCanvas = null;
+        let motionCtx = null;
+        let oldDisplayMatrix = null;
+
+        const BLOCK_SENSITIVITY = 12;
+        const SCREEN_THRESHOLD = 0.08;
+
+        function formatTime(totalSeconds) {
+            const mins = Math.floor(totalSeconds / 60);
+            const secs = totalSeconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        async function startApp() {
+            const inputMinutes = parseInt(document.getElementById('durationInput').value) || 5;
+            penaltySeconds = parseInt(document.getElementById('penaltyInput').value) || 15;
+            slouchPenaltySeconds = parseInt(document.getElementById('postureInput').value) || 5;
+            handsPenaltySeconds = parseInt(document.getElementById('handsInput').value) || 10;
+            timeLeftInSeconds = inputMinutes * 60;
+
+            setupScreen.style.display = 'none';
+            activeScreen.style.display = 'block';
+            timerDisplay.innerText = formatTime(timeLeftInSeconds);
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "user", width: 320, height: 240 }
+                });
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = async () => {
+                    motionCanvas = document.createElement('canvas');
+                    motionCanvas.width = 40;
+                    motionCanvas.height = 30;
+                    motionCtx = motionCanvas.getContext('2d');
+                    
+                    statusText.innerText = "Initializing AI Pose Networks...";
+                    poseNetModel = await posenet.load({
+                        architecture: 'MobileNetV1',
+                        outputStride: 16,
+                        inputResolution: { width: 320, height: 240 },
+                        multiplier: 0.50
+                    });
+
+                    appInterval = setInterval(clockTick, 1000);
+                };
+            } catch (err) {
+                statusText.innerText = "Error: Camera access denied.";
+                console.error(err);
+            }
+        }
+
+        async function clockTick() {
+            if (!isPrepared) {
+                prepCountdown--;
+                statusText.innerText = `Get to position! Hands against the wall at head level! Starting in ${prepCountdown}s...`;
+                if (prepCountdown <= 0) {
+                    isPrepared = true;
+                    statusText.innerText = "Monitoring Active. Keep hands up and stand still.";
+                    statusText.style.color = "#28a745";
+                }
+                return;
+            }
+
+            // REGELLAYER 1: UMGEBUNGS-BEWEGUNG (Pixel)
+            const movementDetected = checkMotion();
+            if (movementDetected) {
+                timeLeftInSeconds += penaltySeconds;
+                wrapper.className = "camera-box motion-violation";
+                statusText.innerText = `MOVEMENT DETECTED! +${penaltySeconds}s added!`;
+                statusText.style.color = "#ff3333";
+                timerDisplay.style.color = "#ff3333";
+                resetAlertStatus();
+            }
+
+            // REGELLAYER 2 & 3: SKELETT-CHECK (PoseNet)
+            if (!movementDetected && poseNetModel && video.readyState >= 2) {
+                try {
+                    const pose = await poseNetModel.estimateSinglePose(video, { flipHorizontal: true });
+                    
+                    const leftShoulder = pose.keypoints.find(k => k.part === 'leftShoulder');
+                    const rightShoulder = pose.keypoints.find(k => k.part === 'rightShoulder');
+                    const leftEar = pose.keypoints.find(k => k.part === 'leftEar');
+                    const rightEar = pose.keypoints.find(k => k.part === 'rightEar');
+                    const leftWrist = pose.keypoints.find(k => k.part === 'leftWrist');
+                    const rightWrist = pose.keypoints.find(k => k.part === 'rightWrist');
+
+                    // Kopfreferenz bestimmen (Ohr-Positionen nutzen)
+                    const headReferenceY = (leftEar.score > 0.4) ? leftEar.position.y : ((rightEar.score > 0.4) ? rightEar.position.y : null);
+
+                    if (leftShoulder.score > 0.5 && rightShoulder.score > 0.5) {
+                        
+                        // --- REGELLAYER 2: HÄNDE UNTEN CHECK ---
+                        let handsDropped = false;
+                        
+                        // Wenn das Handgelenk weiter unten im Bild ist (größerer Y-Wert) als die Ohrhöhe/Kopfhöhe
+                        if (headReferenceY !== null) {
+                            if (leftWrist.score > 0.4 && leftWrist.position.y > headReferenceY) {
+                                handsDropped = true;
+                            }
+                            if (rightWrist.score > 0.4 && rightWrist.position.y > headReferenceY) {
+                                handsDropped = true;
+                            }
+                        } else {
+                            // Backup falls Ohren verdeckt sind: Vergleich mit der Schulterlinie
+                            if (leftWrist.score > 0.4 && leftWrist.position.y > leftShoulder.position.y) handsDropped = true;
+                            if (rightWrist.score > 0.4 && rightWrist.position.y > rightShoulder.position.y) handsDropped = true;
+                        }
+
+                        if (handsDropped) {
+                            timeLeftInSeconds += handsPenaltySeconds;
+                            wrapper.className = "camera-box hands-violation";
+                            statusText.innerText = `HANDS DROPPED! Keep hands at head level! +${handsPenaltySeconds}s`;
+                            statusText.style.color = "#3399ff";
+                            timerDisplay.style.color = "#3399ff";
+                            resetAlertStatus();
+                        } 
+                        
+                        // --- REGELLAYER 3: KÖRPERHALTUNG (Zusatz-Check bei sauberen Händen) ---
+                        else {
+                            const shoulderTilt = Math.abs(leftShoulder.position.y - rightShoulder.position.y);
+                            let isSlouching = false;
+                            
+                            if (leftEar.score > 0.4 && (leftShoulder.position.y - leftEar.position.y) < 22) isSlouching = true;
+                            if (rightEar.score > 0.4 && (rightShoulder.position.y - rightEar.position.y) < 22) isSlouching = true;
+
+                            if (shoulderTilt > 22 || isSlouching) {
+                                timeLeftInSeconds += slouchPenaltySeconds;
+                                wrapper.className = "camera-box posture-violation";
+                                statusText.innerText = "POSTURE VIOLATION! Stand up straight! No leaning.";
+                                statusText.style.color = "#ffaa00";
+                                timerDisplay.style.color = "#ffaa00";
+                                resetAlertStatus();
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("AI Check processing exception:", err);
+                }
+            }
+
+            timeLeftInSeconds--;
+            timerDisplay.innerText = formatTime(timeLeftInSeconds);
+
+            if (timeLeftInSeconds <= 0) {
+                clearInterval(appInterval);
+                statusText.innerText = "Punishment completed! Excellent discipline.";
+                statusText.style.color = "#007aff";
+                timerDisplay.innerText = "DONE";
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+            }
+        }
+
+        function resetAlertStatus() {
+            setTimeout(() => {
+                if (timeLeftInSeconds > 0) {
+                    wrapper.className = "camera-box";
+                    statusText.innerText = "Monitoring Active. Keep hands up and stand still.";
+                    statusText.style.color = "#28a745";
+                    timerDisplay.style.color = "#ffffff";
+                }
+            }, 1200);
+        }
+
+        function checkMotion() {
+            if (!motionCtx || !motionCanvas || video.readyState < 2) return false;
+
+            const w = motionCanvas.width;
+            const h = motionCanvas.height;
+
+            motionCtx.drawImage(video, 0, 0, w, h);
+            const currentFrame = motionCtx.getImageData(0, 0, w, h).data;
+
+            let totalBrightnessSum = 0;
+            const brightnessList = new Float32Array(w * h);
+
+            for (let i = 0; i < currentFrame.length; i += 4) {
+                const brightness = (currentFrame[i] * 0.299) + (currentFrame[i+1] * 0.587) + (currentFrame[i+2] * 0.114);
+                brightnessList[i / 4] = brightness;
+                totalBrightnessSum += brightness;
+            }
+            const averageRoomBrightness = totalBrightnessSum / (w * h);
+
+            const normalizedMatrix = new Float32Array(w * h);
+            for (let i = 0; i < brightnessList.length; i++) {
+                normalizedMatrix[i] = brightnessList[i] - averageRoomBrightness;
+            }
+
+            let motionFlagged = false;
+
+            if (oldDisplayMatrix) {
+                let shiftedBlocks = 0;
+
+                for (let i = 0; i < normalizedMatrix.length; i++) {
+                    const structuralDelta = Math.abs(normalizedMatrix[i] - oldDisplayMatrix[i]);
+                    if (structuralDelta > BLOCK_SENSITIVITY) {
+                        shiftedBlocks++;
+                    }
+                }
+
+                const screenDisruptionRatio = shiftedBlocks / (w * h);
+                if (screenDisruptionRatio > SCREEN_THRESHOLD) {
+                    motionFlagged = true;
+                }
+            }
+
+            oldDisplayMatrix = normalizedMatrix;
+            return motionFlagged;
+        }
+    </script>
 </body>
 </html>
