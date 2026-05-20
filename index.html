@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - HTML Tracker Fixed</title>
+    <title>CornerTime - Absolute HTML Tracker</title>
     <style>
         body {
             background-color: #121212;
@@ -21,7 +21,6 @@
         .app-container { width: 100%; max-width: 500px; text-align: center; }
         .status-message { font-size: 1.2rem; color: #00ffcc; margin-bottom: 20px; font-weight: bold; }
         
-        /* Die Box hält das Video und den echten Kreis zusammen */
         .camera-box { 
             width: 100%; 
             border-radius: 20px; 
@@ -39,23 +38,20 @@
             transform: scaleX(-1); /* Spiegelmodus für das Video */
         }
         
-        /* DIESER KREIS IST EIN ECHTES HTML-ELEMENT – UNZERSTÖRBAR */
+        /* UNZERSTÖRBARER KREIS - JETZT MIT ABSOLUTER FIXIERUNG */
         #htmlTargetCircle {
             position: absolute;
-            width: 80px;
-            height: 80px;
+            width: 70px;
+            height: 70px;
             border: 5px solid #00ffcc;
             border-radius: 50%;
             box-shadow: 0 0 15px rgba(0, 255, 204, 0.6);
             pointer-events: none;
-            display: none; /* Wird erst eingeblendet, wenn der Kopf da ist */
+            display: none; 
             z-index: 99999;
-            /* Zentriert den Punkt exakt auf den Koordinaten */
             transform: translate(-50%, -50%); 
-            transition: left 0.05s ease, top 0.05s ease; /* Macht die Bewegung geschmeidig */
         }
 
-        /* Ein kleiner Zielpunkt in der Mitte des Kreises */
         #htmlTargetCircle::after {
             content: '';
             position: absolute;
@@ -75,17 +71,16 @@
 <body>
 
     <div class="app-container">
-        <h2 style="margin-top: 0; color: #aaa;">Phase 1.3: Unblockbarer HTML-Kreis</h2>
+        <h2 style="margin-top: 0; color: #aaa;">Phase 1.4: Null-Fehler-Korrektur</h2>
         <div id="status" class="status-message">Kamera wird gestartet...</div>
         
         <div class="camera-box" id="camContainer">
             <video id="webcam" autoplay playsinline muted></video>
-            <!-- Unser echtes HTML-Element, das über dem Video schwebt -->
             <div id="htmlTargetCircle"></div>
         </div>
         
         <p style="color: #666; font-size: 0.9rem; margin-top: 15px;">
-            Da dies ein echtes HTML-Element ist, kann dein Browser es nicht ignorieren. Der Kreis MUSS jetzt sichtbar mitschweben!
+            Durch das dynamische Pixel-Update kann der Kreis jetzt nicht mehr in der Ecke einfrieren. Er muss sich mit deinem Kopf bewegen!
         </p>
     </div>
 
@@ -96,8 +91,6 @@
         const statusText = document.getElementById('status');
         
         let poseNetModel = null;
-        let internalWidth = 640;
-        let internalHeight = 480;
 
         async function initDiagnostic() {
             try {
@@ -107,9 +100,6 @@
                 video.srcObject = stream;
                 
                 video.onloadedmetadata = () => {
-                    internalWidth = video.videoWidth || 640;
-                    internalHeight = video.videoHeight || 480;
-                    
                     statusText.innerText = "Lade schnelles KI-Modell...";
                     startAI();
                 };
@@ -139,52 +129,61 @@
         async function processFrame() {
             if (video.readyState >= 2 && poseNetModel) {
                 try {
-                    // Berechne die aktuelle Position der Knochen
-                    const pose = await poseNetModel.estimateSinglePose(video, { flipHorizontal: false });
-                    
-                    const nose = pose.keypoints.find(k => k.part === 'nose');
-                    const leftEar = pose.keypoints.find(k => k.part === 'leftEar');
-                    const rightEar = pose.keypoints.find(k => k.part === 'rightEar');
+                    // --- NEU: DYNAMISCHER FEHLERSCHUTZ ---
+                    // Wir lesen die echten Sensorpixel in JEDEM Frame neu aus. 
+                    // Sind sie 0, brechen wir ab und warten aufs nächste Frame, anstatt durch 0 zu teilen.
+                    const currentVidWidth = video.videoWidth;
+                    const currentVidHeight = video.videoHeight;
 
-                    let headX = null;
-                    let headY = null;
+                    if (currentVidWidth > 0 && currentVidHeight > 0) {
+                        
+                        // Berechne die aktuelle Position der Knochen
+                        const pose = await poseNetModel.estimateSinglePose(video, { flipHorizontal: false });
+                        
+                        const nose = pose.keypoints.find(k => k.part === 'nose');
+                        const leftEar = pose.keypoints.find(k => k.part === 'leftEar');
+                        const rightEar = pose.keypoints.find(k => k.part === 'rightEar');
 
-                    if (nose && nose.score > 0.45) {
-                        headX = nose.position.x;
-                        headY = nose.position.y;
-                    } 
-                    else if (leftEar && rightEar && leftEar.score > 0.35 && rightEar.score > 0.35) {
-                        headX = (leftEar.position.x + rightEar.position.x) / 2;
-                        headY = (leftEar.position.y + rightEar.position.y) / 2;
-                    }
+                        let headX = null;
+                        let headY = null;
 
-                    if (headX !== null && headY !== null) {
-                        // --- MATHEMATISCHE SKALIERUNG AUF DIE DISPLAY-GRÖSSE ---
-                        const containerWidth = container.clientWidth;
-                        const containerHeight = container.clientHeight;
+                        if (nose && nose.score > 0.45) {
+                            headX = nose.position.x;
+                            headY = nose.position.y;
+                        } 
+                        else if (leftEar && rightEar && leftEar.score > 0.35 && rightEar.score > 0.35) {
+                            headX = (leftEar.position.x + rightEar.position.x) / 2;
+                            headY = (leftEar.position.y + rightEar.position.y) / 2;
+                        }
 
-                        // Berechne, wo der Punkt prozentual im Videobild liegt
-                        const percentX = headX / internalWidth;
-                        const percentY = headY / internalHeight;
+                        if (headX !== null && headY !== null) {
+                            // Hol dir die echten Maße der Box auf deinem Handy-Display
+                            const containerWidth = container.clientWidth;
+                            const containerHeight = container.clientHeight;
 
-                        // Da das Video per CSS gespiegelt ist, müssen wir die X-Achse im HTML ebenfalls spiegeln!
-                        const mirroredPercentX = 1 - percentX;
+                            // Sichere Prozentberechnung ohne Division durch Null
+                            const percentX = headX / currentVidWidth;
+                            const percentY = headY / currentVidHeight;
 
-                        // Berechne die echten Pixel-Positionen auf deinem Handy-Bildschirm
-                        const finalX = mirroredPercentX * containerWidth;
-                        const finalY = percentY * containerHeight;
+                            // Spiegelung der X-Achse passend zum gespiegelten CSS-Video
+                            const mirroredPercentX = 1 - percentX;
 
-                        // Schiebe das HTML-Element an die exakte Position
-                        targetCircle.style.left = `${finalX}px`;
-                        targetCircle.style.top = `${finalY}px`;
-                        targetCircle.style.display = 'block'; // Einblenden
+                            // Umrechnung in echte Display-Pixel
+                            const finalX = mirroredPercentX * containerWidth;
+                            const finalY = percentY * containerHeight;
 
-                        statusText.innerText = "Kopf erfasst! 🟢";
-                        statusText.style.color = "#00ffcc";
-                    } else {
-                        targetCircle.style.display = 'none'; // Ausblenden, wenn niemand da ist
-                        statusText.innerText = "Suche Kopf... ⚪";
-                        statusText.style.color = "#aaaaaa";
+                            // Kreis auf deinem Gesicht platzieren
+                            targetCircle.style.left = `${finalX}px`;
+                            targetCircle.style.top = `${finalY}px`;
+                            targetCircle.style.display = 'block'; 
+
+                            statusText.innerText = "Kopf erfasst! 🟢";
+                            statusText.style.color = "#00ffcc";
+                        } else {
+                            targetCircle.style.display = 'none'; 
+                            statusText.innerText = "Suche Kopf... ⚪";
+                            statusText.style.color = "#aaaaaa";
+                        }
                     }
 
                 } catch (err) {
