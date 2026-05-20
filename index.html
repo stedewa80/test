@@ -3,198 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Absolute HTML Tracker</title>
+    <title>CornerTime - Absolute Alignment</title>
     <style>
-        body {
-            background-color: #121212;
-            color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-        .app-container { width: 100%; max-width: 500px; text-align: center; }
-        .status-message { font-size: 1.2rem; color: #00ffcc; margin-bottom: 20px; font-weight: bold; }
-        
+        body { background-color: #121212; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
         .camera-box { 
-            width: 100%; 
-            border-radius: 20px; 
-            border: 6px solid #333333; 
-            overflow: hidden; 
-            background: #000000; 
-            position: relative;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+            width: 90%; max-width: 500px; border-radius: 20px; border: 6px solid #333333; 
+            overflow: hidden; background: #000000; position: relative; 
         }
+        /* KEIN SPIEGELN MEHR HIER */
+        video#webcam { display: block; width: 100%; height: auto; transform: none; }
         
-        video#webcam {
-            display: block;
-            width: 100%;
-            height: auto;
-            transform: scaleX(-1); /* Spiegelmodus für das Video */
-        }
-        
-        /* UNZERSTÖRBARER KREIS - JETZT MIT ABSOLUTER FIXIERUNG */
         #htmlTargetCircle {
             position: absolute;
-            width: 70px;
-            height: 70px;
-            border: 5px solid #00ffcc;
-            border-radius: 50%;
-            box-shadow: 0 0 15px rgba(0, 255, 204, 0.6);
-            pointer-events: none;
-            display: none; 
-            z-index: 99999;
-            transform: translate(-50%, -50%); 
-        }
-
-        #htmlTargetCircle::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 8px;
-            height: 8px;
-            background: #00ffcc;
-            border-radius: 50%;
+            width: 70px; height: 70px;
+            border: 5px solid #00ffcc; border-radius: 50%;
+            pointer-events: none; display: none; z-index: 99999;
             transform: translate(-50%, -50%);
         }
     </style>
-
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
 </head>
 <body>
-
-    <div class="app-container">
-        <h2 style="margin-top: 0; color: #aaa;">Phase 1.4: Null-Fehler-Korrektur</h2>
-        <div id="status" class="status-message">Kamera wird gestartet...</div>
-        
-        <div class="camera-box" id="camContainer">
-            <video id="webcam" autoplay playsinline muted></video>
-            <div id="htmlTargetCircle"></div>
-        </div>
-        
-        <p style="color: #666; font-size: 0.9rem; margin-top: 15px;">
-            Durch das dynamische Pixel-Update kann der Kreis jetzt nicht mehr in der Ecke einfrieren. Er muss sich mit deinem Kopf bewegen!
-        </p>
+    <div class="camera-box" id="camContainer">
+        <video id="webcam" autoplay playsinline muted></video>
+        <div id="htmlTargetCircle"></div>
     </div>
 
     <script>
         const video = document.getElementById('webcam');
         const container = document.getElementById('camContainer');
         const targetCircle = document.getElementById('htmlTargetCircle');
-        const statusText = document.getElementById('status');
-        
-        let poseNetModel = null;
 
-        async function initDiagnostic() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
-                });
-                video.srcObject = stream;
-                
-                video.onloadedmetadata = () => {
-                    statusText.innerText = "Lade schnelles KI-Modell...";
-                    startAI();
-                };
-            } catch (err) {
-                statusText.innerText = "Fehler: Kein Kamerazugriff.";
-                console.error(err);
-            }
-        }
-
-        async function startAI() {
-            try {
-                poseNetModel = await posenet.load({
-                    architecture: 'MobileNetV1',
-                    outputStride: 16,
-                    inputResolution: { width: 257, height: 257 },
-                    multiplier: 0.50
-                });
-                
-                statusText.innerText = "KI Aktiviert! Suche Kopf...";
-                requestAnimationFrame(processFrame);
-            } catch (err) {
-                statusText.innerText = "KI-Ladefehler.";
-                console.error(err);
-            }
-        }
-
-        async function processFrame() {
-            if (video.readyState >= 2 && poseNetModel) {
-                try {
-                    // --- NEU: DYNAMISCHER FEHLERSCHUTZ ---
-                    // Wir lesen die echten Sensorpixel in JEDEM Frame neu aus. 
-                    // Sind sie 0, brechen wir ab und warten aufs nächste Frame, anstatt durch 0 zu teilen.
-                    const currentVidWidth = video.videoWidth;
-                    const currentVidHeight = video.videoHeight;
-
-                    if (currentVidWidth > 0 && currentVidHeight > 0) {
+        async function init() {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+            video.srcObject = stream;
+            video.onloadedmetadata = async () => {
+                const net = await posenet.load();
+                setInterval(async () => {
+                    const pose = await net.estimateSinglePose(video);
+                    const nose = pose.keypoints.find(k => k.part === 'nose');
+                    
+                    if (nose && nose.score > 0.4) {
+                        // Direktes Mapping ohne Spiegel-Logik
+                        const x = (nose.position.x / video.videoWidth) * container.clientWidth;
+                        const y = (nose.position.y / video.videoHeight) * container.clientHeight;
                         
-                        // Berechne die aktuelle Position der Knochen
-                        const pose = await poseNetModel.estimateSinglePose(video, { flipHorizontal: false });
-                        
-                        const nose = pose.keypoints.find(k => k.part === 'nose');
-                        const leftEar = pose.keypoints.find(k => k.part === 'leftEar');
-                        const rightEar = pose.keypoints.find(k => k.part === 'rightEar');
-
-                        let headX = null;
-                        let headY = null;
-
-                        if (nose && nose.score > 0.45) {
-                            headX = nose.position.x;
-                            headY = nose.position.y;
-                        } 
-                        else if (leftEar && rightEar && leftEar.score > 0.35 && rightEar.score > 0.35) {
-                            headX = (leftEar.position.x + rightEar.position.x) / 2;
-                            headY = (leftEar.position.y + rightEar.position.y) / 2;
-                        }
-
-                        if (headX !== null && headY !== null) {
-                            // Hol dir die echten Maße der Box auf deinem Handy-Display
-                            const containerWidth = container.clientWidth;
-                            const containerHeight = container.clientHeight;
-
-                            // Sichere Prozentberechnung ohne Division durch Null
-                            const percentX = headX / currentVidWidth;
-                            const percentY = headY / currentVidHeight;
-
-                            // Spiegelung der X-Achse passend zum gespiegelten CSS-Video
-                            const mirroredPercentX = 1 - percentX;
-
-                            // Umrechnung in echte Display-Pixel
-                            const finalX = mirroredPercentX * containerWidth;
-                            const finalY = percentY * containerHeight;
-
-                            // Kreis auf deinem Gesicht platzieren
-                            targetCircle.style.left = `${finalX}px`;
-                            targetCircle.style.top = `${finalY}px`;
-                            targetCircle.style.display = 'block'; 
-
-                            statusText.innerText = "Kopf erfasst! 🟢";
-                            statusText.style.color = "#00ffcc";
-                        } else {
-                            targetCircle.style.display = 'none'; 
-                            statusText.innerText = "Suche Kopf... ⚪";
-                            statusText.style.color = "#aaaaaa";
-                        }
+                        targetCircle.style.left = `${x}px`;
+                        targetCircle.style.top = `${y}px`;
+                        targetCircle.style.display = 'block';
+                    } else {
+                        targetCircle.style.display = 'none';
                     }
-
-                } catch (err) {
-                    console.error("Frame-Verarbeitungsfehler:", err);
-                }
-            }
-            
-            requestAnimationFrame(processFrame);
+                }, 100);
+            };
         }
-
-        window.onload = initDiagnostic;
+        init();
     </script>
 </body>
 </html>
