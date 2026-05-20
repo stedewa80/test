@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Aspect Ratio Fix</title>
+    <title>CornerTime - Skeleton Diagnostic</title>
     <style>
         body { background-color: #121212; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; color: #fff; font-family: sans-serif; }
         
         .camera-box { 
             width: 90%; 
-            max-width: 400px; /* Schön kompakt für Smartphones */
+            max-width: 400px; 
             border-radius: 20px; 
             border: 6px solid #333333; 
             overflow: hidden; 
             background: #000000; 
             position: relative; 
-            /* Ein perfektes Quadrat erzwingen */
             aspect-ratio: 1 / 1;
         }
         
@@ -26,15 +25,24 @@
             object-fit: cover;
         }
         
-        #htmlTargetCircle {
+        /* BASIS-STYLING FÜR ALLE TRACKING-PUNKTE */
+        .joint-indicator {
             position: absolute; 
-            width: 50px; height: 50px;
-            border: 4px solid #00ffcc; border-radius: 50%;
-            pointer-events: none; display: none; z-index: 99999;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            pointer-events: none; 
+            display: none; 
+            z-index: 99999;
             transform: translate(-50%, -50%);
-            box-shadow: 0 0 15px rgba(0, 255, 204, 0.6);
+            transition: left 0.05s linear, top 0.05s linear;
         }
-        #status { font-weight: bold; margin-bottom: 15px; color: #00ffcc; font-size: 1.2rem; }
+
+        /* FARBEN FÜR DIE EINZELNEN KÖRPERTEILE */
+        #circleNose { border: 4px solid #00ffcc; box-shadow: 0 0 15px rgba(0, 255, 204, 0.6); }
+        #circleLeftShoulder, #circleRightShoulder { border: 4px solid #28a745; box-shadow: 0 0 15px rgba(40, 167, 69, 0.6); }
+        #circleLeftWrist, #circleRightWrist { border: 4px solid #3399ff; box-shadow: 0 0 15px rgba(51, 153, 255, 0.6); }
+
+        #status { font-weight: bold; margin-bottom: 15px; color: #00ffcc; font-size: 1.2rem; text-align: center; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
@@ -44,7 +52,13 @@
     <div class="camera-box" id="camContainer">
         <video id="webcam" autoplay playsinline muted style="display:none;"></video>
         <canvas id="processingCanvas"></canvas>
-        <div id="htmlTargetCircle"></div>
+        
+        <!-- Die unblockbaren HTML-Skelettpunkte -->
+        <div id="circleNose" class="joint-indicator"></div>
+        <div id="circleLeftShoulder" class="joint-indicator"></div>
+        <div id="circleRightShoulder" class="joint-indicator"></div>
+        <div id="circleLeftWrist" class="joint-indicator"></div>
+        <div id="circleRightWrist" class="joint-indicator"></div>
     </div>
 
     <script>
@@ -52,12 +66,19 @@
         const canvas = document.getElementById('processingCanvas');
         const ctx = canvas.getContext('2d');
         const container = document.getElementById('camContainer');
-        const targetCircle = document.getElementById('htmlTargetCircle');
         const status = document.getElementById('status');
+
+        // HTML-Elemente für die Punkte greifen
+        const joints = {
+            nose: document.getElementById('circleNose'),
+            leftShoulder: document.getElementById('circleLeftShoulder'),
+            rightShoulder: document.getElementById('circleRightShoulder'),
+            leftWrist: document.getElementById('circleLeftWrist'),
+            rightWrist: document.getElementById('circleRightWrist')
+        };
 
         async function init() {
             try {
-                // Wir bitten das Handy um ein hochkant optimiertes Bild
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } 
                 });
@@ -65,14 +86,12 @@
                 
                 video.onloadedmetadata = async () => {
                     const net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.50 });
-                    status.innerText = "Suche Gesicht...";
+                    status.innerText = "Skelett-Erkennung aktiv...";
 
                     function loop() {
                         canvas.width = 257;
                         canvas.height = 257;
 
-                        // --- SMART CROP & MIRROR LOGIK ---
-                        // Wir schneiden die Mitte des Kamerabildes quadratisch aus, damit nichts verzerrt
                         const vWidth = video.videoWidth;
                         const vHeight = video.videoHeight;
                         const minDim = Math.min(vWidth, vHeight);
@@ -80,11 +99,8 @@
                         const sy = (vHeight - minDim) / 2;
 
                         ctx.save();
-                        // Spiegel-Effekt für die Anzeige aktivieren
                         ctx.translate(257, 0);
                         ctx.scale(-1, 1);
-
-                        // Zeichne den quadratischen Ausschnitt gespiegelt auf das Canvas
                         ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, 257, 257);
                         ctx.restore();
 
@@ -92,28 +108,56 @@
                     }
                     loop();
 
+                    // Erkennungsschleife
                     setInterval(async () => {
                         const pose = await net.estimateSinglePose(canvas);
-                        const nose = pose.keypoints.find(k => k.part === 'nose');
                         
-                        if (nose && nose.score > 0.3) {
-                            // Da das Canvas jetzt gespiegelt ist, rechnet PoseNet die Punkte bereits gespiegelt aus.
-                            // Wir müssen die Punkte nur noch auf die aktuelle Breite des Containers hochrechnen!
-                            const x = (nose.position.x / 257) * container.clientWidth;
-                            const y = (nose.position.y / 257) * container.clientHeight;
+                        // Helferfunktion, um einen Punkt zu positionieren und zu skalieren
+                        function updateJoint(partName, element, minScore = 0.3) {
+                            const keypoint = pose.keypoints.find(k => k.part === partName);
                             
-                            targetCircle.style.left = `${x}px`;
-                            targetCircle.style.top = `${y}px`;
-                            targetCircle.style.display = 'block';
-                            status.innerText = "Kopf erfasst! 🟢";
-                        } else {
-                            targetCircle.style.display = 'none';
-                            status.innerText = "Suche Kopf...";
+                            if (keypoint && keypoint.score > minScore) {
+                                const x = (keypoint.position.x / 257) * container.clientWidth;
+                                const y = (keypoint.position.y / 257) * container.clientHeight;
+                                
+                                element.style.left = `${x}px`;
+                                element.style.top = `${y}px`;
+                                element.style.display = 'block';
+                                return true;
+                            } else {
+                                element.style.display = 'none';
+                                return false;
+                            }
                         }
-                    }, 60); // Etwas schnellerer Intervall für flüssigeres Tracking
+
+                        // Alle 5 Punkte unabhängig voneinander updaten
+                        const foundNose = updateJoint('nose', joints.nose, 0.35);
+                        const foundLShoulder = updateJoint('leftShoulder', joints.leftShoulder, 0.3);
+                        const foundRShoulder = updateJoint('rightShoulder', joints.rightShoulder, 0.3);
+                        
+                        // Bei den Handgelenken senken wir den Mindestwert leicht auf 0.25, 
+                        // da Hände von hinten schwerer zu erkennen sind
+                        const foundLWrist = updateJoint('leftWrist', joints.leftWrist, 0.25);
+                        const foundRWrist = updateJoint('rightWrist', joints.rightWrist, 0.25);
+
+                        // Status-Text dynamisch anpassen
+                        if (foundLShoulder && foundRShoulder) {
+                            if (foundLWrist && foundRWrist) {
+                                status.innerText = "Perfekt! Volles Skelett erfasst. 🟢";
+                                status.style.color = "#00ffcc";
+                            } else {
+                                status.innerText = "Körper da, suche Hände... 🔵";
+                                status.style.color = "#3399ff";
+                            }
+                        } else {
+                            status.innerText = "Suche Person... Stell dich ins Bild. ⚪";
+                            status.style.color = "#aaaaaa";
+                        }
+
+                    }, 80);
                 };
             } catch(e) { 
-                status.innerText = "Kamerafehler! Bitte Berechtigung prüfen."; 
+                status.innerText = "Kamerafehler!"; 
             }
         }
         init();
