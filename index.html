@@ -3,43 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Perfect Fit</title>
+    <title>CornerTime - Aspect Ratio Fix</title>
     <style>
-        body { background-color: #121212; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; color: #fff; }
+        body { background-color: #121212; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; color: #fff; font-family: sans-serif; }
         
         .camera-box { 
-            width: 95%; 
-            max-width: 500px; 
+            width: 90%; 
+            max-width: 400px; /* Schön kompakt für Smartphones */
             border-radius: 20px; 
             border: 6px solid #333333; 
             overflow: hidden; 
             background: #000000; 
             position: relative; 
-            /* Hier erzwingen wir, dass das Canvas sich an die Box anpasst */
+            /* Ein perfektes Quadrat erzwingen */
+            aspect-ratio: 1 / 1;
         }
         
-        /* Das Canvas darf niemals größer als die Box sein */
         canvas#processingCanvas { 
             display: block; 
             width: 100%; 
-            height: auto; 
+            height: 100%; 
+            object-fit: cover;
         }
         
         #htmlTargetCircle {
             position: absolute; 
-            width: 60px; height: 60px;
-            border: 5px solid #00ffcc; border-radius: 50%;
+            width: 50px; height: 50px;
+            border: 4px solid #00ffcc; border-radius: 50%;
             pointer-events: none; display: none; z-index: 99999;
             transform: translate(-50%, -50%);
-            transition: left 0.1s linear, top 0.1s linear;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.6);
         }
-        #status { font-weight: bold; margin-bottom: 10px; color: #00ffcc; }
+        #status { font-weight: bold; margin-bottom: 15px; color: #00ffcc; font-size: 1.2rem; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
 </head>
 <body>
-    <div id="status">Starte...</div>
+    <div id="status">Kamera startet...</div>
     <div class="camera-box" id="camContainer">
         <video id="webcam" autoplay playsinline muted style="display:none;"></video>
         <canvas id="processingCanvas"></canvas>
@@ -56,14 +57,37 @@
 
         async function init() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                // Wir bitten das Handy um ein hochkant optimiertes Bild
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } 
+                });
                 video.srcObject = stream;
+                
                 video.onloadedmetadata = async () => {
                     const net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.50 });
-                    
+                    status.innerText = "Suche Gesicht...";
+
                     function loop() {
-                        // Zeichne 257x257 auf das Canvas
-                        ctx.drawImage(video, 0, 0, 257, 257);
+                        canvas.width = 257;
+                        canvas.height = 257;
+
+                        // --- SMART CROP & MIRROR LOGIK ---
+                        // Wir schneiden die Mitte des Kamerabildes quadratisch aus, damit nichts verzerrt
+                        const vWidth = video.videoWidth;
+                        const vHeight = video.videoHeight;
+                        const minDim = Math.min(vWidth, vHeight);
+                        const sx = (vWidth - minDim) / 2;
+                        const sy = (vHeight - minDim) / 2;
+
+                        ctx.save();
+                        // Spiegel-Effekt für die Anzeige aktivieren
+                        ctx.translate(257, 0);
+                        ctx.scale(-1, 1);
+
+                        // Zeichne den quadratischen Ausschnitt gespiegelt auf das Canvas
+                        ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, 257, 257);
+                        ctx.restore();
+
                         requestAnimationFrame(loop);
                     }
                     loop();
@@ -73,7 +97,8 @@
                         const nose = pose.keypoints.find(k => k.part === 'nose');
                         
                         if (nose && nose.score > 0.3) {
-                            // Berechne Position relativ zum Container
+                            // Da das Canvas jetzt gespiegelt ist, rechnet PoseNet die Punkte bereits gespiegelt aus.
+                            // Wir müssen die Punkte nur noch auf die aktuelle Breite des Containers hochrechnen!
                             const x = (nose.position.x / 257) * container.clientWidth;
                             const y = (nose.position.y / 257) * container.clientHeight;
                             
@@ -85,9 +110,11 @@
                             targetCircle.style.display = 'none';
                             status.innerText = "Suche Kopf...";
                         }
-                    }, 80);
+                    }, 60); // Etwas schnellerer Intervall für flüssigeres Tracking
                 };
-            } catch(e) { status.innerText = "Kamerafehler!"; }
+            } catch(e) { 
+                status.innerText = "Kamerafehler! Bitte Berechtigung prüfen."; 
+            }
         }
         init();
     </script>
