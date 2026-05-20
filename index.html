@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Elbow Guard</title>
+    <title>CornerTime - AI Head Diagnostic</title>
     <style>
         body {
             background-color: #121212;
@@ -19,166 +19,61 @@
             box-sizing: border-box;
         }
         .app-container { width: 100%; max-width: 500px; text-align: center; }
-        .timer-display { font-size: 5rem; font-weight: bold; font-variant-numeric: tabular-nums; margin: 10px 0; transition: color 0.2s; }
-        .status-message { font-size: 1.1rem; color: #aaaaaa; margin-bottom: 20px; min-height: 3.5rem; display: flex; align-items: center; justify-content: center; padding: 0 10px; }
+        .status-message { font-size: 1.2rem; color: #00ffcc; margin-bottom: 20px; font-weight: bold; }
         
         .camera-box { 
             width: 100%; 
             border-radius: 20px; 
-            border: 8px solid #333333; 
+            border: 6px solid #333333; 
             overflow: hidden; 
             background: #000000; 
-            position: relative; 
-            transition: border-color 0.2s, box-shadow 0.2s; 
+            position: relative;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
         }
         
-        .camera-box.motion-violation { border-color: #ff3333 !important; box-shadow: 0 0 35px rgba(255, 51, 51, 0.7); }
-        .camera-box.posture-violation { border-color: #ffaa00 !important; box-shadow: 0 0 35px rgba(255, 170, 0, 0.7); }
-        .camera-box.hands-violation { border-color: #3399ff !important; box-shadow: 0 0 35px rgba(51, 153, 255, 0.7); }
-        
-        video { display: block; width: 100%; height: auto; transform: scaleX(-1); }
-
-        .setup-screen { background: #1e1e1e; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); text-align: left; }
-        h2 { text-align: center; margin-top: 0; }
-        button { background: #007aff; color: white; border: none; padding: 15px 30px; font-size: 1.2rem; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 20px; width: 100%; }
-        input[type="number"] { width: 100%; padding: 10px; background: #2a2a2a; border: 2px solid #444; color: white; font-size: 1.1rem; border-radius: 8px; box-sizing: border-box; text-align: center; }
-        
-        .option-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #333; }
-        .option-label { font-weight: bold; font-size: 1rem; }
-        .option-desc { font-size: 0.85rem; color: #aaa; margin-top: 2px; }
-        .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .3s; border-radius: 26px; }
-        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .3s; border-radius: 50%; }
-        input:checked + .slider { background-color: #007aff; }
-        input:checked + .slider:before { transform: translateX(24px); }
+        /* Wir nutzen nur noch das Canvas zur Anzeige, kein rohes Video-Element mehr */
+        canvas#displayCanvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            transform: scaleX(-1); /* Spiegelmodus */
+        }
     </style>
 
+    <!-- Absolut stabile Basis-Skripte -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet@2.2.2/dist/posenet.min.js"></script>
 </head>
 <body>
 
     <div class="app-container">
-        <!-- MODULARES SETUP MENU -->
-        <div id="setupScreen" class="setup-screen">
-            <h2>CornerTime Config</h2>
-            
-            <div style="margin-bottom: 20px;">
-                <label style="display:block; margin-bottom:5px; color:#ccc;">Wall Time (Minutes):</label>
-                <input type="number" id="durationInput" value="5" min="1">
-            </div>
-
-            <h3 style="border-bottom: 2px solid #007aff; padding-bottom: 5px; margin-top: 25px;">Wächter aktivieren:</h3>
-
-            <div class="option-row">
-                <div>
-                    <div class="option-label">1. Bewegungserkennung</div>
-                    <div class="option-desc">Bestraft Zucken über Pixeldifferenz.</div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="modMotion" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <div class="option-row">
-                <div>
-                    <div class="option-label">2. Anwesenheits-Check (Anti-Cheat)</div>
-                    <div class="option-desc">Straft sofort ab, wenn man aus dem Bild geht.</div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="modCheat" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <div class="option-row">
-                <div>
-                    <div class="option-label">3. Hände-Hoch-Kontrolle</div>
-                    <div class="option-desc">Prüft Arme & Hände auf Kopfhöhe (von hinten optimiert).</div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="modHands" checked> <!-- Standardmäßig AKTIVIERT zum Testen -->
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <div class="option-row">
-                <div>
-                    <div class="option-label">4. Haltungs-Check</div>
-                    <div class="option-desc">Erkennt seitliches Anlehnen oder Zusammensacken.</div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="modPosture">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <button onclick="startApp()">Start Monitoring</button>
+        <h2 style="margin-top: 0; color: #aaa;">Phase 1: Kopf-Erkennung</h2>
+        <div id="status" class="status-message">Kamera wird gestartet...</div>
+        
+        <div class="camera-box">
+            <!-- Das versteckte Video liefert die Daten -->
+            <video id="webcam" autoplay playsinline muted style="display:none;"></video>
+            <!-- Das Canvas zeichnet das Video UND den Tracking-Kreis -->
+            <canvas id="displayCanvas"></canvas>
         </div>
-
-        <!-- AKTIVE ÜBERWACHUNG -->
-        <div id="activeScreen" style="display: none;">
-            <div id="status" class="status-message">Vorbereitung läuft...</div>
-            <div id="timer" class="timer-display">00:00</div>
-            <div id="cameraWrapper" class="camera-box">
-                <video id="webcam" autoplay playsinline muted></video>
-            </div>
-        </div>
+        
+        <p style="color: #666; font-size: 0.9rem; margin-top: 15px;">
+            Sobald die KI deinen Kopf erfasst, erscheint ein grüner Kreis auf deinem Gesicht/Hinterkopf.
+        </p>
     </div>
 
     <script>
-        const setupScreen = document.getElementById('setupScreen');
-        const activeScreen = document.getElementById('activeScreen');
         const video = document.getElementById('webcam');
-        const wrapper = document.getElementById('cameraWrapper');
-        const timerDisplay = document.getElementById('timer');
+        const canvas = document.getElementById('displayCanvas');
+        const ctx = canvas.getContext('2d');
         const statusText = document.getElementById('status');
-
-        let useMotion = true;
-        let useCheat = true;
-        let useHands = true;
-        let usePosture = false;
-        let needsPoseNet = false;
-
-        let timeLeftInSeconds = 0;
-        let isPrepared = false;
-        let prepCountdown = 12; // 12 Sek Zeit zum Hinstellen
-        let appInterval = null;
-
+        
         let poseNetModel = null;
-        let motionCanvas = null;
-        let motionCtx = null;
-        let oldDisplayMatrix = null;
 
-        const BLOCK_SENSITIVITY = 12;
-        const SCREEN_THRESHOLD = 0.08;
-
-        function formatTime(totalSeconds) {
-            const mins = Math.floor(totalSeconds / 60);
-            const secs = totalSeconds % 60;
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        async function startApp() {
-            const inputMinutes = parseInt(document.getElementById('durationInput').value) || 5;
-            timeLeftInSeconds = inputMinutes * 60;
-
-            useMotion = document.getElementById('modMotion').checked;
-            useCheat = document.getElementById('modCheat').checked;
-            useHands = document.getElementById('modHands').checked;
-            usePosture = document.getElementById('modPosture').checked;
-
-            needsPoseNet = (useCheat || useHands || usePosture);
-
-            setupScreen.style.display = 'none';
-            activeScreen.style.display = 'block';
-            timerDisplay.innerText = formatTime(timeLeftInSeconds);
-
+        async function initDiagnostic() {
             try {
-                if (needsPoseNet && window.tf) {
+                // Erzwinge den sicheren CPU-Modus gegen Abstürze
+                if (window.tf) {
                     await tf.setBackend('cpu');
                 }
 
@@ -187,202 +82,97 @@
                 });
                 video.srcObject = stream;
                 
-                video.onloadedmetadata = async () => {
-                    motionCanvas = document.createElement('canvas');
-                    motionCanvas.width = 40;
-                    motionCanvas.height = 30;
-                    motionCtx = motionCanvas.getContext('2d');
+                video.onloadedmetadata = () => {
+                    canvas.width = 320;
+                    canvas.height = 240;
                     
-                    if (needsPoseNet) {
-                        statusText.innerText = "Lade KI-Skelett-Erkennung (CPU-Modus)...";
-                        poseNetModel = await posenet.load({
-                            architecture: 'MobileNetV1',
-                            outputStride: 16,
-                            inputResolution: 257,
-                            multiplier: 0.50
-                        });
-                    }
-
-                    appInterval = setInterval(clockTick, 1000);
+                    statusText.innerText = "Lade PoseNet KI-Modell...";
+                    startAI();
                 };
             } catch (err) {
-                statusText.innerText = "Kamerafehler: Zugriff verweigert.";
+                statusText.innerText = "Fehler: Kein Kamerazugriff.";
                 console.error(err);
             }
         }
 
-        async function clockTick() {
-            if (!isPrepared) {
-                prepCountdown--;
-                statusText.innerText = `Hände an die Wand auf Kopfhöhe! Start in ${prepCountdown}s...`;
-                if (prepCountdown <= 0) {
-                    isPrepared = true;
-                    statusText.innerText = "Überwachung aktiv. Bitte stillstehen.";
-                    statusText.style.color = "#28a745";
-                }
-                return;
+        async function startAI() {
+            try {
+                poseNetModel = await posenet.load({
+                    architecture: 'MobileNetV1',
+                    outputStride: 16,
+                    inputResolution: 257,
+                    multiplier: 0.50
+                });
+                
+                statusText.innerText = "KI Aktiviert! Suche Kopf...";
+                // Starte die Render-Schleife (so schnell das Handy rechnen kann)
+                requestAnimationFrame(processFrame);
+            } catch (err) {
+                statusText.innerText = "KI-Ladefehler.";
+                console.error(err);
             }
+        }
 
-            let violationTriggered = false;
-
-            // 1. BEWEGUNG (Pixel)
-            if (useMotion) {
-                let movementDetected = checkMotion();
-                if (movementDetected) {
-                    timeLeftInSeconds += 15;
-                    wrapper.className = "camera-box motion-violation";
-                    statusText.innerText = "BEWEGUNG ERKANNT! +15s";
-                    statusText.style.color = "#ff3333";
-                    timerDisplay.style.color = "#ff3333";
-                    violationTriggered = true;
-                    resetAlertStatus();
-                }
-            }
-
-            // KI-BASED PLUGINS
-            if (!violationTriggered && needsPoseNet && poseNetModel && video.readyState >= 2) {
+        async function processFrame() {
+            if (video.readyState >= 2 && poseNetModel) {
                 try {
-                    const pose = await poseNetModel.estimateSinglePose(video, { flipHorizontal: true });
+                    // 1. Zeichne das aktuelle Kamerabild direkt auf das sichtbare Canvas
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     
-                    const leftShoulder = pose.keypoints.find(k => k.part === 'leftShoulder');
-                    const rightShoulder = pose.keypoints.find(k => k.part === 'rightShoulder');
+                    // 2. Berechne das Skelett für dieses Frame
+                    const pose = await poseNetModel.estimateSinglePose(video, { flipHorizontal: false });
+                    
+                    // 3. Suche nach Kopfpunkten (Nase, Augen oder Ohren)
+                    const nose = pose.keypoints.find(k => k.part === 'nose');
                     const leftEar = pose.keypoints.find(k => k.part === 'leftEar');
                     const rightEar = pose.keypoints.find(k => k.part === 'rightEar');
-                    const leftWrist = pose.keypoints.find(k => k.part === 'leftWrist');
-                    const rightWrist = pose.keypoints.find(k => k.part === 'rightWrist');
-                    const leftElbow = pose.keypoints.find(k => k.part === 'leftElbow');
-                    const rightElbow = pose.keypoints.find(k => k.part === 'rightElbow');
 
-                    // 2. ANTI-CHEAT (Prüft ob Schultern im Bild sind)
-                    if (useCheat && (leftShoulder.score < 0.20 || rightShoulder.score < 0.20)) {
-                        timeLeftInSeconds += 15;
-                        wrapper.className = "camera-box motion-violation";
-                        statusText.innerText = "ANTI-CHEAT: KEINE PERSON AN DER WAND! +15s";
-                        statusText.style.color = "#ff3333";
-                        timerDisplay.style.color = "#ff3333";
-                        violationTriggered = true;
-                        resetAlertStatus();
+                    let headX = null;
+                    let headY = null;
+
+                    // Wenn die Nase da ist (Vorderansicht)
+                    if (nose && nose.score > 0.4) {
+                        headX = nose.position.x;
+                        headY = nose.position.y;
+                    } 
+                    // Wenn du von hinten stehst, sieht die KI oft nur die Ohren
+                    else if (leftEar && rightEar && leftEar.score > 0.3 && rightEar.score > 0.3) {
+                        headX = (leftEar.position.x + rightEar.position.x) / 2;
+                        headY = (leftEar.position.y + rightEar.position.y) / 2;
                     }
 
-                    if (!violationTriggered) {
-                        // Berechne die Schulterachse als feste mathematische Untergrenze für die Arme
-                        const shoulderLineY = (leftShoulder.position.y + rightShoulder.position.y) / 2;
+                    // 4. ZEICHNE DEN GRÜNEN KREIS, wenn ein Kopf gefunden wurde
+                    if (headX !== null && headY !== null) {
+                        ctx.beginPath();
+                        ctx.arc(headX, headY, 35, 0, 2 * Math.PI); // Kreis mit Radius 35 um den Kopf
+                        ctx.strokeStyle = '#00ffcc'; // Hellgrün/Türkis
+                        ctx.lineWidth = 4;
+                        ctx.stroke();
                         
-                        // Wenn der Kopf sichtbar ist, nehmen wir die Ohrenlinie als ideale Kopfhöhe
-                        let headReferenceY = null;
-                        if (leftEar.score > 0.3) headReferenceY = leftEar.position.y;
-                        else if (rightEar.score > 0.3) headReferenceY = rightEar.position.y;
+                        // Kleiner Zielpunkt in der Mitte
+                        ctx.beginPath();
+                        ctx.arc(headX, headY, 4, 0, 2 * Math.PI);
+                        ctx.fillStyle = '#00ffcc';
+                        ctx.fill();
                         
-                        // Ziel-Grenzlinie für die Hände: Entweder Kopfhöhe, oder ein Stück über den Schultern
-                        const targetLineY = (headReferenceY !== null) ? headReferenceY : (shoulderLineY - 25);
-
-                        // 3. MODUL: HÄNDE HOCH (Mit Ellenbogen-Backup)
-                        if (useHands) {
-                            let leftArmUp = false;
-                            let rightArmUp = false;
-
-                            // Prüfe den LINKEN Arm: Ist das Handgelenk ODER der Ellenbogen über der Linie?
-                            if ((leftWrist.score > 0.3 && leftWrist.position.y < targetLineY) || 
-                                (leftElbow.score > 0.4 && leftElbow.position.y < shoulderLineY)) {
-                                leftArmUp = true;
-                            }
-
-                            // Prüfe den RECHTEN Arm: Ist das Handgelenk ODER der Ellenbogen über der Linie?
-                            if ((rightWrist.score > 0.3 && rightWrist.position.y < targetLineY) || 
-                                (rightElbow.score > 0.4 && rightElbow.position.y < shoulderLineY)) {
-                                rightArmUp = true;
-                            }
-
-                            // Wenn einer der beiden Arme komplett runterhängt
-                            if (!leftArmUp || !rightArmUp) {
-                                timeLeftInSeconds += 10;
-                                wrapper.className = "camera-box hands-violation";
-                                statusText.innerText = "HÄNDE UNTEN! Bitte die Hände oben an der Wand lassen! +10s";
-                                statusText.style.color = "#3399ff";
-                                timerDisplay.style.color = "#3399ff";
-                                violationTriggered = true;
-                                resetAlertStatus();
-                            }
-                        }
-
-                        // 4. MODUL: CORNER HALTUNG
-                        if (!violationTriggered && usePosture) {
-                            const shoulderTilt = Math.abs(leftShoulder.position.y - rightShoulder.position.y);
-                            let isSlouching = false;
-                            if (headReferenceY !== null && headReferenceY > (shoulderLineY - 10)) isSlouching = true;
-
-                            if (shoulderTilt > 35 || isSlouching) {
-                                timeLeftInSeconds += 5;
-                                wrapper.className = "camera-box posture-violation";
-                                statusText.innerText = "HALTUNGS-WARNUNG! Nicht anlehnen oder zusammensacken! +5s";
-                                statusText.style.color = "#ffaa00";
-                                timerDisplay.style.color = "#ffaa00";
-                                violationTriggered = true;
-                                resetAlertStatus();
-                            }
-                        }
+                        statusText.innerText = "Kopf erfasst! Tracking stabil. 🟢";
+                        statusText.style.color = "#00ffcc";
+                    } else {
+                        statusText.innerText = "Suche Kopf... Stell dich vor die Kamera. ⚪";
+                        statusText.style.color = "#aaaaaa";
                     }
+
                 } catch (err) {
-                    console.error("Fehler beim KI-Check:", err);
+                    console.error("Frame-Verarbeitungsfehler:", err);
                 }
             }
-
-            timeLeftInSeconds--;
-            timerDisplay.innerText = formatTime(timeLeftInSeconds);
-
-            if (timeLeftInSeconds <= 0) {
-                clearInterval(appInterval);
-                statusText.innerText = "Geschafft! Du darfst von der Wand wegtreten.";
-                statusText.style.color = "#007aff";
-                timerDisplay.innerText = "DONE";
-                if (video.srcObject) {
-                    video.srcObject.getTracks().forEach(track => track.stop());
-                }
-            }
+            
+            // Schleife fortsetzen
+            requestAnimationFrame(processFrame);
         }
 
-        function resetAlertStatus() {
-            setTimeout(() => {
-                if (timeLeftInSeconds > 0) {
-                    wrapper.className = "camera-box";
-                    statusText.innerText = "Überwachung aktiv. Bitte stillstehen.";
-                    statusText.style.color = "#28a745";
-                    timerDisplay.style.color = "#ffffff";
-                }
-            }, 1200);
-        }
-
-        function checkMotion() {
-            if (!motionCtx || !motionCanvas || video.readyState < 2) return false;
-            const w = motionCanvas.width;
-            const h = motionCanvas.height;
-            motionCtx.drawImage(video, 0, 0, w, h);
-            const currentFrame = motionCtx.getImageData(0, 0, w, h).data;
-            let totalBrightnessSum = 0;
-            const brightnessList = new Float32Array(w * h);
-            for (let i = 0; i < currentFrame.length; i += 4) {
-                const brightness = (currentFrame[i] * 0.299) + (currentFrame[i+1] * 0.587) + (currentFrame[i+2] * 0.114);
-                brightnessList[i / 4] = brightness;
-                totalBrightnessSum += brightness;
-            }
-            const averageRoomBrightness = totalBrightnessSum / (w * h);
-            const normalizedMatrix = new Float32Array(w * h);
-            for (let i = 0; i < brightnessList.length; i++) {
-                normalizedMatrix[i] = brightnessList[i] - averageRoomBrightness;
-            }
-            let motionFlagged = false;
-            if (oldDisplayMatrix) {
-                let shiftedBlocks = 0;
-                for (let i = 0; i < normalizedMatrix.length; i++) {
-                    const structuralDelta = Math.abs(normalizedMatrix[i] - oldDisplayMatrix[i]);
-                    if (structuralDelta > BLOCK_SENSITIVITY) shiftedBlocks++;
-                }
-                const screenDisruptionRatio = shiftedBlocks / (w * h);
-                if (screenDisruptionRatio > SCREEN_THRESHOLD) motionFlagged = true;
-            }
-            oldDisplayMatrix = normalizedMatrix;
-            return motionFlagged;
-        }
+        // Direkt beim Laden starten
+        window.onload = initDiagnostic;
     </script>
 </body>
 </html>
