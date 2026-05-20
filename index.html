@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Full Scale Guardian</title>
+    <title>CornerTime - Full Scale Back-Guardian</title>
     <style>
         body { 
             background-color: #121212; 
@@ -74,13 +74,13 @@
         /* Zwingt das Bild auf die volle Gehäusegröße */
         canvas#processingCanvas { display: block; width: 100%; height: 100%; object-fit: cover; }
         
-        /* Unblockbare HTML-Indikatoren mit korrigiertem CSS-Selektor */
+        /* Unblockbare HTML-Indikatoren */
         .joint-indicator { 
             position: absolute; width: 25px; height: 25px; border-radius: 50%; 
             pointer-events: none; display: none; z-index: 9999; transform: translate(-50%, -50%); 
             transition: left 0.05s linear, top 0.05s linear;
         }
-        #ptNose { border: 4px solid #00ffcc; background: rgba(0,255,204,0.2); }
+        #ptHead { border: 4px solid #00ffcc; background: rgba(0,255,204,0.2); }
         #ptLShoulder, #ptRShoulder { border: 4px solid #28a745; background: rgba(40,167,69,0.2); }
         #ptLWrist, #ptRWrist { border: 4px solid #3399ff; background: rgba(51,153,255,0.2); }
         
@@ -99,7 +99,7 @@
         <!-- SETUP SCREEN -->
         <div id="setupScreen" class="setup-screen">
             <h2>Wächter-Konfig</h2>
-            <div class="option-row"><span>1. Bewegung (Pixel-Check)</span><label class="switch"><input type="checkbox" id="modMotion" checked><span class="slider"></span></label></div>
+            <div class="option-row"><span>1. Bewegung (Voll-Körper)</span><label class="switch"><input type="checkbox" id="modMotion" checked><span class="slider"></span></label></div>
             <div class="option-row"><span>2. Anwesenheit (Anti-Cheat)</span><label class="switch"><input type="checkbox" id="modPresence" checked><span class="slider"></span></label></div>
             <div class="option-row"><span>3. Hände-Kontrolle (Höhe)</span><label class="switch"><input type="checkbox" id="modHands" checked><span class="slider"></span></label></div>
             <div class="option-row"><span>4. Haltung (Schulter-Neigung)</span><label class="switch"><input type="checkbox" id="modPosture"><span class="slider"></span></label></div>
@@ -114,8 +114,8 @@
                 <video id="webcam" autoplay playsinline muted style="display:none;"></video>
                 <canvas id="processingCanvas"></canvas>
                 
-                <!-- Sichtbare Tracking-Punkte -->
-                <div id="ptNose" class="joint-indicator"></div>
+                <!-- Sichtbare Tracking-Punkte für die Rückenansicht -->
+                <div id="ptHead" class="joint-indicator"></div>
                 <div id="ptLShoulder" class="joint-indicator"></div>
                 <div id="ptRShoulder" class="joint-indicator"></div>
                 <div id="ptLWrist" class="joint-indicator"></div>
@@ -132,7 +132,7 @@
         const status = document.getElementById('status');
 
         const pts = {
-            nose: document.getElementById('ptNose'),
+            head: document.getElementById('ptHead'),
             lS: document.getElementById('ptLShoulder'),
             rS: document.getElementById('ptRShoulder'),
             lW: document.getElementById('ptLWrist'),
@@ -160,17 +160,14 @@
                     status.innerText = "In Position gehen! (5s)";
                     status.style.color = "#ffaa00";
                     
-                    // Starte Videoschleife
                     loop();
                     
-                    // Vorbereitungszeit abwarten
                     setTimeout(() => {
                         isPrepared = true;
                         status.innerText = "Überwachung aktiv! 🟢";
                         status.style.color = "#00ffcc";
                     }, 5000);
 
-                    // Regel-Überprüfung alle 350ms für ein knackigeres Feedback
                     setInterval(checkRules, 350);
                 };
             } catch(e) {
@@ -196,30 +193,50 @@
             if (!net || video.readyState < 2) return;
 
             const pose = await net.estimateSinglePose(canvas);
-            const n = pose.keypoints.find(k => k.part === 'nose'),
-                  lS = pose.keypoints.find(k => k.part === 'leftShoulder'),
-                  rS = pose.keypoints.find(k => k.part === 'rightShoulder'),
-                  lW = pose.keypoints.find(k => k.part === 'leftWrist'),
-                  rW = pose.keypoints.find(k => k.part === 'rightWrist');
+            
+            // Relevante Keypoints filtern
+            const lS = pose.keypoints.find(k => k.part === 'leftShoulder');
+            const rS = pose.keypoints.find(k => k.part === 'rightShoulder');
+            const lW = pose.keypoints.find(k => k.part === 'leftWrist');
+            const rW = pose.keypoints.find(k => k.part === 'rightWrist');
+            const lE = pose.keypoints.find(k => k.part === 'leftEar');
+            const rE = pose.keypoints.find(k => k.part === 'rightEar');
 
-            // --- VISUELLE PUNKTE PLATZIEREN ---
-            function updatePoint(kp, el, minScore = 0.25) {
-                if (kp && kp.score > minScore) {
-                    el.style.left = `${(kp.position.x / 257) * container.clientWidth}px`;
-                    el.style.top = `${(kp.position.y / 257) * container.clientHeight}px`;
-                    el.style.display = 'block';
-                    return true;
+            // Erkennungs-Sicherheiten berechnen
+            const foundLShoulder = lS && lS.score > 0.25;
+            const foundRShoulder = rS && rS.score > 0.25;
+            const foundLWrist = lW && lW.score > 0.25;
+            const foundRWrist = rW && rW.score > 0.25;
+            const foundLeftEar = lE && lE.score > 0.25;
+            const foundRightEar = rE && rE.score > 0.25;
+
+            // --- VISUELLE DIAGNOSE-PUNKTE PLATZIEREN ---
+            function drawIndicator(element, kp, isVisible) {
+                if (isVisible) {
+                    element.style.left = `${(kp.position.x / 257) * container.clientWidth}px`;
+                    element.style.top = `${(kp.position.y / 257) * container.clientHeight}px`;
+                    element.style.display = 'block';
                 } else {
-                    el.style.display = 'none';
-                    return false;
+                    element.style.display = 'none';
                 }
             }
 
-            const foundNose = updatePoint(n, pts.nose, 0.3);
-            const foundLShoulder = updatePoint(lS, pts.lS, 0.25);
-            const foundRShoulder = updatePoint(rS, pts.rS, 0.25);
-            const foundLWrist = updatePoint(lW, pts.lW, 0.25);
-            const foundRWrist = updatePoint(rW, pts.rW, 0.25);
+            // Kopfpunkt aus Ohrenmitte berechnen
+            let mockHeadPoint = null;
+            if (foundLeftEar && foundRightEar) {
+                mockHeadPoint = {
+                    position: {
+                        x: (lE.position.x + rE.position.x) / 2,
+                        y: (lE.position.y + rE.position.y) / 2
+                    }
+                };
+            }
+            
+            drawIndicator(pts.head, mockHeadPoint, (foundLeftEar && foundRightEar));
+            drawIndicator(pts.lS, lS, foundLShoulder);
+            drawIndicator(pts.rS, rS, foundRShoulder);
+            drawIndicator(pts.lW, lW, foundLWrist);
+            drawIndicator(pts.rW, rW, foundRWrist);
 
             if (!isPrepared) return;
 
@@ -227,16 +244,49 @@
             let currentColor = "#00ffcc";
             let borderColor = "#333333";
 
-            // --- WÄCHTER 1: BEWEGUNG ---
-            if (document.getElementById('modMotion').checked && prevPose && n && n.score > 0.3) {
-                const deltaX = Math.abs(n.position.x - prevPose.x);
-                const deltaY = Math.abs(n.position.y - prevPose.y);
-                if (deltaX > 25 || deltaY > 25) {
+            // --- WÄCHTER 1: MULTI-GELENK-BEWEGUNG ---
+            if (document.getElementById('modMotion').checked && prevPose) {
+                let movementTriggered = false;
+
+                // Check 1: Kopf (Ohrenmitte)
+                if (foundLeftEar && foundRightEar && prevPose.head) {
+                    const currentHeadX = (lE.position.x + rE.position.x) / 2;
+                    const currentHeadY = (lE.position.y + rE.position.y) / 2;
+                    if (Math.abs(currentHeadX - prevPose.head.x) > 8 || Math.abs(currentHeadY - prevPose.head.y) > 8) {
+                        movementTriggered = true;
+                    }
+                }
+
+                // Check 2: Schultern (Mittelpunkt)
+                if (foundLShoulder && foundRShoulder && prevPose.shoulder) {
+                    const currentShoulderX = (lS.position.x + rS.position.x) / 2;
+                    const currentShoulderY = (lS.position.y + rS.position.y) / 2;
+                    if (Math.abs(currentShoulderX - prevPose.shoulder.x) > 8 || Math.abs(currentShoulderY - prevPose.shoulder.y) > 8) {
+                        movementTriggered = true;
+                    }
+                }
+
+                // Check 3: Hände einzeln
+                if (foundLWrist && prevPose.lWrist) {
+                    if (Math.abs(lW.position.x - prevPose.lWrist.x) > 12 || Math.abs(lW.position.y - prevPose.lWrist.y) > 12) movementTriggered = true;
+                }
+                if (foundRWrist && prevPose.rWrist) {
+                    if (Math.abs(rW.position.x - prevPose.rWrist.x) > 12 || Math.abs(rW.position.y - prevPose.rWrist.y) > 12) movementTriggered = true;
+                }
+
+                if (movementTriggered) {
                     currentAlert = "BEWEGUNG DETEKTIERT! Stillstehen! 🔴";
                     currentColor = "#ff3333"; borderColor = "#ff3333";
                 }
             }
-            if (n && n.score > 0.3) { prevPose = { x: n.position.x, y: n.position.y }; }
+            
+            // Historie für den nächsten Frame sichern
+            prevPose = {
+                head: (foundLeftEar && foundRightEar) ? { x: (lE.position.x + rE.position.x)/2, y: (lE.position.y + rE.position.y)/2 } : null,
+                shoulder: (foundLShoulder && foundRShoulder) ? { x: (lS.position.x + rS.position.x)/2, y: (lS.position.y + rS.position.y)/2 } : null,
+                lWrist: foundLWrist ? { x: lW.position.x, y: lW.position.y } : null,
+                rWrist: foundRWrist ? { x: rW.position.x, y: rW.position.y } : null
+            };
 
             // --- WÄCHTER 2: ANWESENHEIT ---
             if (document.getElementById('modPresence').checked) {
@@ -246,10 +296,12 @@
                 }
             }
 
-            // --- WÄCHTER 3: HÄNDE ---
-            if (document.getElementById('modHands').checked && foundNose) {
-                const leftDropped = foundLWrist && (lW.position.y > n.position.y);
-                const rightDropped = foundRWrist && (rW.position.y > n.position.y);
+            // --- WÄCHTER 3: HÄNDE UNTER KOPFHÖHE ---
+            if (document.getElementById('modHands').checked && foundLeftEar && foundRightEar) {
+                const headY = (lE.position.y + rE.position.y) / 2;
+                
+                const leftDropped = foundLWrist && (lW.position.y > headY);
+                const rightDropped = foundRWrist && (rW.position.y > headY);
                 
                 if (leftDropped || rightDropped) {
                     currentAlert = "HÄNDE HOCH! Arme sind zu tief! 🔵";
@@ -257,7 +309,7 @@
                 }
             }
 
-            // --- WÄCHTER 4: HALTUNG ---
+            // --- WÄCHTER 4: HALTUNG (SCHULTER-NEIGUNG) ---
             if (document.getElementById('modPosture').checked && foundLShoulder && foundRShoulder) {
                 const shoulderTilt = Math.abs(lS.position.y - rS.position.y);
                 if (shoulderTilt > 22) {
@@ -266,7 +318,7 @@
                 }
             }
 
-            // UI-Farbe aktualisieren
+            // UI-Update abschicken
             status.innerText = currentAlert;
             status.style.color = currentColor;
             container.style.borderColor = borderColor;
