@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Visual Guardian Fixed</title>
+    <title>CornerTime - Bulletproof Visual Guardian</title>
     <style>
         body {
             background-color: #121212;
@@ -47,7 +47,7 @@
             height: 100%;
             transform: scaleX(-1); 
             pointer-events: none; 
-            z-index: 10; /* Zwingt das Zeichenbrett über die Videoschicht */
+            z-index: 999; /* Maximaler Vordergrund-Wert */
         }
 
         .setup-screen { background: #1e1e1e; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
@@ -56,8 +56,9 @@
         label { display: block; margin-bottom: 8px; color: #ccc; }
     </style>
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+    <!-- Verwende stabile, zusammenpassende Versionen der Google CDNs -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet@2.2.2/dist/posenet.min.js"></script>
 </head>
 <body>
 
@@ -140,6 +141,12 @@
             timerDisplay.innerText = formatTime(timeLeftInSeconds);
 
             try {
+                // 1. SCHRIFF: WebGL-Zwang umgehen und TensorFlow strikt auf die CPU schalten
+                if (window.tf) {
+                    await tf.setBackend('cpu');
+                    console.log("Stabiler CPU Backend-Modus erzwungen.");
+                }
+
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: "user", width: 320, height: 240 }
                 });
@@ -153,11 +160,13 @@
                     
                     sCtx = sCanvas.getContext('2d');
                     
-                    statusText.innerText = "Initializing AI Pose Networks... (Kann auf Handys bis zu 10 Sek. dauern)";
+                    statusText.innerText = "Initializing AI Pose Networks...";
+                    
+                    // Verwende ein noch robusteres, fehlertoleranteres Modellierungs-Setup
                     poseNetModel = await posenet.load({
                         architecture: 'MobileNetV1',
                         outputStride: 16,
-                        inputResolution: { width: 320, height: 240 },
+                        inputResolution: 257, // Offizieller, stabiler Standardwert für Mobilgeräte
                         multiplier: 0.50
                     });
 
@@ -195,7 +204,6 @@
                 try {
                     const pose = await poseNetModel.estimateSinglePose(video, { flipHorizontal: true });
                     
-                    // --- FIX: LEINWAND AN DIE ECHTE DISPLAY-GRÖSSE ANPASSEN ---
                     if (sCanvas.width !== video.clientWidth || sCanvas.height !== video.clientHeight) {
                         sCanvas.width = video.clientWidth;
                         sCanvas.height = video.clientHeight;
@@ -203,7 +211,7 @@
 
                     if (sCtx) sCtx.clearRect(0, 0, sCanvas.width, sCanvas.height);
 
-                    // Skalierungsfaktoren berechnen, um KI-Koordinaten auf Bildschirmgröße umzurechnen
+                    // Skalierung basierend auf der echten Kamera-Eingabe von 320x240 berechnen
                     const scaleX = sCanvas.width / 320;
                     const scaleY = sCanvas.height / 240;
 
@@ -214,17 +222,18 @@
                     const leftWrist = pose.keypoints.find(k => k.part === 'leftWrist');
                     const rightWrist = pose.keypoints.find(k => k.part === 'rightWrist');
 
-                    // --- LIVE-PUNKTE SKALIERT ZEICHNEN ---
+                    // --- LIVE-PUNKTE ZEICHNEN ---
                     if (sCtx) {
                         const partsToDraw = [leftShoulder, rightShoulder, leftEar, rightEar, leftWrist, rightWrist];
                         partsToDraw.forEach(part => {
-                            if (part && part.score > 0.3) {
+                            // Score-Hürde leicht gesenkt auf 0.25 für bessere Sichtbarkeit bei schlechtem Licht
+                            if (part && part.score > 0.25) {
                                 sCtx.beginPath();
-                                // Umrechnung auf die echten Display-Pixel deines Handys
                                 const drawX = part.position.x * scaleX;
                                 const drawY = part.position.y * scaleY;
                                 
-                                sCtx.arc(drawX, drawY, 8, 0, 2 * Math.PI);
+                                // Punkte vergrößert auf Radius 10 für bessere Sichtbarkeit
+                                sCtx.arc(drawX, drawY, 10, 0, 2 * Math.PI);
                                 sCtx.fillStyle = (part.part.includes('Wrist')) ? '#3399ff' : '#00ffcc';
                                 sCtx.fill();
                             }
