@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - AI Head Diagnostic</title>
+    <title>CornerTime - HighSpeed Diagnostic</title>
     <style>
         body {
             background-color: #121212;
@@ -31,7 +31,6 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
         }
         
-        /* Wir nutzen nur noch das Canvas zur Anzeige, kein rohes Video-Element mehr */
         canvas#displayCanvas {
             display: block;
             width: 100%;
@@ -40,25 +39,23 @@
         }
     </style>
 
-    <!-- Absolut stabile Basis-Skripte -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet@2.2.2/dist/posenet.min.js"></script>
+    <!-- Verwende die neuesten, optimierten Skripte, die WebGL auf Handys perfekt unterstützen -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
 </head>
 <body>
 
     <div class="app-container">
-        <h2 style="margin-top: 0; color: #aaa;">Phase 1: Kopf-Erkennung</h2>
+        <h2 style="margin-top: 0; color: #aaa;">Phase 1.1: HighSpeed Kopf-Erkennung</h2>
         <div id="status" class="status-message">Kamera wird gestartet...</div>
         
         <div class="camera-box">
-            <!-- Das versteckte Video liefert die Daten -->
             <video id="webcam" autoplay playsinline muted style="display:none;"></video>
-            <!-- Das Canvas zeichnet das Video UND den Tracking-Kreis -->
             <canvas id="displayCanvas"></canvas>
         </div>
         
         <p style="color: #666; font-size: 0.9rem; margin-top: 15px;">
-            Sobald die KI deinen Kopf erfasst, erscheint ein grüner Kreis auf deinem Gesicht/Hinterkopf.
+            Das Video sollte jetzt wieder flüssig laufen. Der Kreis muss nun direkt auf deinem Kopf sitzen.
         </p>
     </div>
 
@@ -72,21 +69,20 @@
 
         async function initDiagnostic() {
             try {
-                // Erzwinge den sicheren CPU-Modus gegen Abstürze
-                if (window.tf) {
-                    await tf.setBackend('cpu');
-                }
+                // Wir lassen TensorFlow standardmäßig WebGL/WebGPU wählen für maximale Handy-Geschwindigkeit
+                statusText.innerText = "Kamera wird geladen...";
 
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "user", width: 320, height: 240 }
+                    video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
                 });
                 video.srcObject = stream;
                 
                 video.onloadedmetadata = () => {
-                    canvas.width = 320;
-                    canvas.height = 240;
+                    // Setze die interne mathematische Auflösung des Canvas auf die echten Videopixel
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 480;
                     
-                    statusText.innerText = "Lade PoseNet KI-Modell...";
+                    statusText.innerText = "Lade schnelles KI-Modell...";
                     startAI();
                 };
             } catch (err) {
@@ -97,15 +93,15 @@
 
         async function startAI() {
             try {
+                // Schnelles, mobil-optimiertes Setup
                 poseNetModel = await posenet.load({
                     architecture: 'MobileNetV1',
                     outputStride: 16,
-                    inputResolution: 257,
+                    inputResolution: { width: 257, height: 257 },
                     multiplier: 0.50
                 });
                 
                 statusText.innerText = "KI Aktiviert! Suche Kopf...";
-                // Starte die Render-Schleife (so schnell das Handy rechnen kann)
                 requestAnimationFrame(processFrame);
             } catch (err) {
                 statusText.innerText = "KI-Ladefehler.";
@@ -116,13 +112,18 @@
         async function processFrame() {
             if (video.readyState >= 2 && poseNetModel) {
                 try {
-                    // 1. Zeichne das aktuelle Kamerabild direkt auf das sichtbare Canvas
+                    // Falls sich die Videogröße dreht oder ändert (z.B. Hochformat/Querformat)
+                    if (canvas.width !== video.videoWidth) {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                    }
+
+                    // 1. Zeichne das Kamerabild im Original-Verhältnis auf das Canvas
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     
-                    // 2. Berechne das Skelett für dieses Frame
+                    // 2. Berechne die Knochen im Original-Verhältnis
                     const pose = await poseNetModel.estimateSinglePose(video, { flipHorizontal: false });
                     
-                    // 3. Suche nach Kopfpunkten (Nase, Augen oder Ohren)
                     const nose = pose.keypoints.find(k => k.part === 'nose');
                     const leftEar = pose.keypoints.find(k => k.part === 'leftEar');
                     const rightEar = pose.keypoints.find(k => k.part === 'rightEar');
@@ -130,35 +131,33 @@
                     let headX = null;
                     let headY = null;
 
-                    // Wenn die Nase da ist (Vorderansicht)
-                    if (nose && nose.score > 0.4) {
+                    if (nose && nose.score > 0.45) {
                         headX = nose.position.x;
                         headY = nose.position.y;
                     } 
-                    // Wenn du von hinten stehst, sieht die KI oft nur die Ohren
-                    else if (leftEar && rightEar && leftEar.score > 0.3 && rightEar.score > 0.3) {
+                    else if (leftEar && rightEar && leftEar.score > 0.35 && rightEar.score > 0.35) {
                         headX = (leftEar.position.x + rightEar.position.x) / 2;
                         headY = (leftEar.position.y + rightEar.position.y) / 2;
                     }
 
-                    // 4. ZEICHNE DEN GRÜNEN KREIS, wenn ein Kopf gefunden wurde
+                    // 3. ZEICHNE DEN GRÜNEN KREIS (Jetzt exakt an den Original-Koordinaten angepasst)
                     if (headX !== null && headY !== null) {
                         ctx.beginPath();
-                        ctx.arc(headX, headY, 35, 0, 2 * Math.PI); // Kreis mit Radius 35 um den Kopf
-                        ctx.strokeStyle = '#00ffcc'; // Hellgrün/Türkis
-                        ctx.lineWidth = 4;
+                        // Radius an die echte Videoauflösung angepasst (ca. 50 Pixel)
+                        ctx.arc(headX, headY, 50, 0, 2 * Math.PI); 
+                        ctx.strokeStyle = '#00ffcc'; 
+                        ctx.lineWidth = 6; // Etwas dicker für hohe Auflösungen
                         ctx.stroke();
                         
-                        // Kleiner Zielpunkt in der Mitte
                         ctx.beginPath();
-                        ctx.arc(headX, headY, 4, 0, 2 * Math.PI);
+                        ctx.arc(headX, headY, 6, 0, 2 * Math.PI);
                         ctx.fillStyle = '#00ffcc';
                         ctx.fill();
                         
-                        statusText.innerText = "Kopf erfasst! Tracking stabil. 🟢";
+                        statusText.innerText = "Kopf erfasst! 🟢";
                         statusText.style.color = "#00ffcc";
                     } else {
-                        statusText.innerText = "Suche Kopf... Stell dich vor die Kamera. ⚪";
+                        statusText.innerText = "Suche Kopf... ⚪";
                         statusText.style.color = "#aaaaaa";
                     }
 
@@ -167,11 +166,10 @@
                 }
             }
             
-            // Schleife fortsetzen
+            // Schleife flüssig fortsetzen
             requestAnimationFrame(processFrame);
         }
 
-        // Direkt beim Laden starten
         window.onload = initDiagnostic;
     </script>
 </body>
