@@ -2,18 +2,38 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>CornerTime - Pre-Processed Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CornerTime - Perfect Fit</title>
     <style>
         body { background-color: #121212; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; color: #fff; }
-        .camera-box { width: 90%; max-width: 500px; border-radius: 20px; border: 6px solid #333333; overflow: hidden; background: #000000; position: relative; }
-        video { display: none; } /* Wir nutzen nur das Canvas */
-        canvas#processingCanvas { display: block; width: 100%; height: auto; }
+        
+        .camera-box { 
+            width: 95%; 
+            max-width: 500px; 
+            border-radius: 20px; 
+            border: 6px solid #333333; 
+            overflow: hidden; 
+            background: #000000; 
+            position: relative; 
+            /* Hier erzwingen wir, dass das Canvas sich an die Box anpasst */
+        }
+        
+        /* Das Canvas darf niemals größer als die Box sein */
+        canvas#processingCanvas { 
+            display: block; 
+            width: 100%; 
+            height: auto; 
+        }
+        
         #htmlTargetCircle {
-            position: absolute; width: 60px; height: 60px;
-            border: 5px solid #ff00ff; border-radius: 50%;
+            position: absolute; 
+            width: 60px; height: 60px;
+            border: 5px solid #00ffcc; border-radius: 50%;
             pointer-events: none; display: none; z-index: 99999;
             transform: translate(-50%, -50%);
+            transition: left 0.1s linear, top 0.1s linear;
         }
+        #status { font-weight: bold; margin-bottom: 10px; color: #00ffcc; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
@@ -21,7 +41,7 @@
 <body>
     <div id="status">Starte...</div>
     <div class="camera-box" id="camContainer">
-        <video id="webcam" autoplay playsinline muted></video>
+        <video id="webcam" autoplay playsinline muted style="display:none;"></video>
         <canvas id="processingCanvas"></canvas>
         <div id="htmlTargetCircle"></div>
     </div>
@@ -35,39 +55,39 @@
         const status = document.getElementById('status');
 
         async function init() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
-            video.onloadedmetadata = async () => {
-                const net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.50 });
-                
-                // Wir zeichnen das Video in einem Loop auf das 257x257 Canvas
-                function draw() {
-                    canvas.width = 257;
-                    canvas.height = 257;
-                    ctx.drawImage(video, 0, 0, 257, 257);
-                    requestAnimationFrame(draw);
-                }
-                draw();
-
-                setInterval(async () => {
-                    const pose = await net.estimateSinglePose(canvas);
-                    const nose = pose.keypoints.find(k => k.part === 'nose');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                video.onloadedmetadata = async () => {
+                    const net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.50 });
                     
-                    if (nose && nose.score > 0.3) {
-                        // Da das Canvas jetzt fest 257x257 ist, stimmen diese Koordinaten!
-                        const x = (nose.position.x / 257) * container.clientWidth;
-                        const y = (nose.position.y / 257) * container.clientHeight;
-                        
-                        targetCircle.style.left = `${x}px`;
-                        targetCircle.style.top = `${y}px`;
-                        targetCircle.style.display = 'block';
-                        status.innerText = "Kopf: " + Math.round(nose.position.x) + " / " + Math.round(nose.position.y);
-                    } else {
-                        targetCircle.style.display = 'none';
-                        status.innerText = "Suche Kopf...";
+                    function loop() {
+                        // Zeichne 257x257 auf das Canvas
+                        ctx.drawImage(video, 0, 0, 257, 257);
+                        requestAnimationFrame(loop);
                     }
-                }, 100);
-            };
+                    loop();
+
+                    setInterval(async () => {
+                        const pose = await net.estimateSinglePose(canvas);
+                        const nose = pose.keypoints.find(k => k.part === 'nose');
+                        
+                        if (nose && nose.score > 0.3) {
+                            // Berechne Position relativ zum Container
+                            const x = (nose.position.x / 257) * container.clientWidth;
+                            const y = (nose.position.y / 257) * container.clientHeight;
+                            
+                            targetCircle.style.left = `${x}px`;
+                            targetCircle.style.top = `${y}px`;
+                            targetCircle.style.display = 'block';
+                            status.innerText = "Kopf erfasst! 🟢";
+                        } else {
+                            targetCircle.style.display = 'none';
+                            status.innerText = "Suche Kopf...";
+                        }
+                    }, 80);
+                };
+            } catch(e) { status.innerText = "Kamerafehler!"; }
         }
         init();
     </script>
