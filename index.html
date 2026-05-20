@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Final Tracking</title>
+    <title>CornerTime - Force Map</title>
     <style>
         body { background-color: #121212; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; color: #fff; }
         .camera-box { 
@@ -12,18 +12,18 @@
         }
         video#webcam { display: block; width: 100%; height: auto; }
         #htmlTargetCircle {
-            position: absolute; width: 70px; height: 70px;
-            border: 5px solid #00ffcc; border-radius: 50%;
+            position: absolute; width: 60px; height: 60px;
+            border: 5px solid #ff00ff; border-radius: 50%;
             pointer-events: none; display: none; z-index: 99999;
-            transform: translate(-50%, -50%); transition: all 0.1s ease-out;
+            transform: translate(-50%, -50%);
         }
-        #status { margin-bottom: 10px; font-weight: bold; color: #00ffcc; }
+        #status { font-weight: bold; margin-bottom: 10px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
 </head>
 <body>
-    <div id="status">Initialisiere...</div>
+    <div id="status">Starte...</div>
     <div class="camera-box" id="camContainer">
         <video id="webcam" autoplay playsinline muted></video>
         <div id="htmlTargetCircle"></div>
@@ -38,35 +38,32 @@
         async function init() {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
-            video.onloadedmetadata = async () => {
-                const net = await posenet.load({
-                    architecture: 'MobileNetV1',
-                    outputStride: 16,
-                    inputResolution: 257,
-                    multiplier: 0.50
-                });
+            
+            const net = await posenet.load({
+                architecture: 'MobileNetV1',
+                outputStride: 16,
+                inputResolution: 257,
+                multiplier: 0.50
+            });
+            
+            setInterval(async () => {
+                const pose = await net.estimateSinglePose(video, { flipHorizontal: false });
+                const nose = pose.keypoints.find(k => k.part === 'nose');
                 
-                status.innerText = "Tracking aktiv...";
-                
-                setInterval(async () => {
-                    const pose = await net.estimateSinglePose(video);
-                    const nose = pose.keypoints.find(k => k.part === 'nose');
+                if (nose && nose.score > 0.3) {
+                    // WICHTIG: Hier skalieren wir auf das 257x257 Modell-Raster
+                    const x = (nose.position.x / 257) * container.clientWidth;
+                    const y = (nose.position.y / 257) * container.clientHeight;
                     
-                    if (nose && nose.score > 0.3) {
-                        // WICHTIG: Wir nutzen video.videoWidth/Height, die das Handy jetzt korrekt liefert
-                        const x = (nose.position.x / video.videoWidth) * container.clientWidth;
-                        const y = (nose.position.y / video.videoHeight) * container.clientHeight;
-                        
-                        targetCircle.style.left = `${x}px`;
-                        targetCircle.style.top = `${y}px`;
-                        targetCircle.style.display = 'block';
-                        status.innerText = "Kopf erfasst! X: " + Math.round(x) + " Y: " + Math.round(y);
-                    } else {
-                        targetCircle.style.display = 'none';
-                        status.innerText = "Suche Kopf...";
-                    }
-                }, 80);
-            };
+                    targetCircle.style.left = `${x}px`;
+                    targetCircle.style.top = `${y}px`;
+                    targetCircle.style.display = 'block';
+                    status.innerText = "Kopf: " + Math.round(nose.position.x) + " / " + Math.round(nose.position.y);
+                } else {
+                    targetCircle.style.display = 'none';
+                    status.innerText = "Suche Kopf...";
+                }
+            }, 100);
         }
         init();
     </script>
