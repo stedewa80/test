@@ -3,28 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Absolute Alignment</title>
+    <title>CornerTime - Final Tracking</title>
     <style>
-        body { background-color: #121212; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        body { background-color: #121212; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; color: #fff; }
         .camera-box { 
             width: 90%; max-width: 500px; border-radius: 20px; border: 6px solid #333333; 
             overflow: hidden; background: #000000; position: relative; 
         }
-        /* KEIN SPIEGELN MEHR HIER */
-        video#webcam { display: block; width: 100%; height: auto; transform: none; }
-        
+        video#webcam { display: block; width: 100%; height: auto; }
         #htmlTargetCircle {
-            position: absolute;
-            width: 70px; height: 70px;
+            position: absolute; width: 70px; height: 70px;
             border: 5px solid #00ffcc; border-radius: 50%;
             pointer-events: none; display: none; z-index: 99999;
-            transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%); transition: all 0.1s ease-out;
         }
+        #status { margin-bottom: 10px; font-weight: bold; color: #00ffcc; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
 </head>
 <body>
+    <div id="status">Initialisiere...</div>
     <div class="camera-box" id="camContainer">
         <video id="webcam" autoplay playsinline muted></video>
         <div id="htmlTargetCircle"></div>
@@ -34,28 +33,39 @@
         const video = document.getElementById('webcam');
         const container = document.getElementById('camContainer');
         const targetCircle = document.getElementById('htmlTargetCircle');
+        const status = document.getElementById('status');
 
         async function init() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
             video.onloadedmetadata = async () => {
-                const net = await posenet.load();
+                const net = await posenet.load({
+                    architecture: 'MobileNetV1',
+                    outputStride: 16,
+                    inputResolution: 257,
+                    multiplier: 0.50
+                });
+                
+                status.innerText = "Tracking aktiv...";
+                
                 setInterval(async () => {
                     const pose = await net.estimateSinglePose(video);
                     const nose = pose.keypoints.find(k => k.part === 'nose');
                     
-                    if (nose && nose.score > 0.4) {
-                        // Direktes Mapping ohne Spiegel-Logik
+                    if (nose && nose.score > 0.3) {
+                        // WICHTIG: Wir nutzen video.videoWidth/Height, die das Handy jetzt korrekt liefert
                         const x = (nose.position.x / video.videoWidth) * container.clientWidth;
                         const y = (nose.position.y / video.videoHeight) * container.clientHeight;
                         
                         targetCircle.style.left = `${x}px`;
                         targetCircle.style.top = `${y}px`;
                         targetCircle.style.display = 'block';
+                        status.innerText = "Kopf erfasst! X: " + Math.round(x) + " Y: " + Math.round(y);
                     } else {
                         targetCircle.style.display = 'none';
+                        status.innerText = "Suche Kopf...";
                     }
-                }, 100);
+                }, 80);
             };
         }
         init();
