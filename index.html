@@ -3,57 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - The Guardian</title>
+    <title>CornerTime - Modular Guardian</title>
     <style>
-        body { 
-            background-color: #121212; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            min-height: 100vh; 
-            margin: 0; 
-            color: #fff; 
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
-        }
+        body { background-color: #121212; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .app-container { width: 100%; max-width: 400px; }
+        .setup-screen { background: #1e1e1e; padding: 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .option-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .switch { position: relative; display: inline-block; width: 45px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .3s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: #007aff; }
+        input:checked + .slider:before { transform: translateX(20px); }
         
-        .app-container { width: 100%; max-width: 400px; text-align: center; padding: 15px; box-sizing: border-box; }
-        .timer-display { font-size: 5rem; font-weight: bold; font-variant-numeric: tabular-nums; margin: 10px 0; transition: color 0.2s; }
-        .status-message { font-size: 1.2rem; color: #aaaaaa; margin-bottom: 20px; min-height: 3rem; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-        
-        .camera-box { 
-            width: 100%; 
-            border-radius: 20px; 
-            border: 8px solid #333333; 
-            overflow: hidden; 
-            background: #000000; 
-            position: relative; 
-            aspect-ratio: 1 / 1;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        
-        /* Visuelle Alarm-Rahmen bei Fehlern */
-        .camera-box.cheat-violation { border-color: #ff3333 !important; box-shadow: 0 0 35px rgba(255, 51, 51, 0.7); }
-        .camera-box.hands-violation { border-color: #3399ff !important; box-shadow: 0 0 35px rgba(51, 153, 255, 0.7); }
-        
+        /* Kamera-Box */
+        #activeScreen { display: none; }
+        .camera-box { width: 100%; border-radius: 20px; border: 6px solid #333333; overflow: hidden; background: #000; position: relative; aspect-ratio: 1/1; }
         canvas#processingCanvas { display: block; width: 100%; height: 100%; object-fit: cover; }
-        
-        /* Die unblockbaren HTML-Punkte */
-        .joint-indicator {
-            position: absolute; width: 30px; height: 30px; border-radius: 50%;
-            pointer-events: none; display: none; z-index: 99999;
-            transform: translate(-50%, -50%); transition: left 0.05s linear, top 0.05s linear;
-        }
-        #circleNose { border: 4px solid #00ffcc; background: rgba(0,255,204,0.2); }
-        #circleLeftShoulder, #circleRightShoulder { border: 4px solid #28a745; }
-        #circleLeftWrist, #circleRightWrist { border: 4px solid #3399ff; background: rgba(51,153,255,0.2); }
-
-        /* Setup-Bildschirm */
-        .setup-screen { background: #1e1e1e; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); text-align: left; }
-        h2 { text-align: center; margin-top: 0; color: #00ffcc; }
-        button { background: #007aff; color: white; border: none; padding: 15px 30px; font-size: 1.2rem; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 20px; width: 100%; }
-        input[type="number"] { width: 100%; padding: 12px; background: #2a2a2a; border: 2px solid #444; color: white; font-size: 1.2rem; border-radius: 8px; box-sizing: border-box; text-align: center; }
+        .joint-indicator { position: absolute; width: 30px; height: 30px; border-radius: 50%; pointer-events: none; display: none; z-index: 999; transform: translate(-50%, -50%); border: 3px solid #00ffcc; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
@@ -61,199 +28,73 @@
 <body>
 
     <div class="app-container">
-        <!-- SETUP SCREEN -->
+        <!-- MODULARES SETUP -->
         <div id="setupScreen" class="setup-screen">
-            <h2>CornerTime</h2>
-            <div style="margin-bottom: 10px;">
-                <label style="display:block; margin-bottom:5px; color:#ccc;">Wall Time (Minutes):</label>
-                <input type="number" id="durationInput" value="5" min="1">
-            </div>
-            <button onclick="startApp()">Start Monitoring</button>
+            <h2>Wächter-Konfig</h2>
+            <div class="option-row"><span>1. Bewegung (Pixel)</span><label class="switch"><input type="checkbox" id="modMotion" checked><span class="slider"></span></label></div>
+            <div class="option-row"><span>2. Anwesenheit (KI)</span><label class="switch"><input type="checkbox" id="modPresence" checked><span class="slider"></span></label></div>
+            <div class="option-row"><span>3. Hände-Kontrolle</span><label class="switch"><input type="checkbox" id="modHands" checked><span class="slider"></span></label></div>
+            <div class="option-row"><span>4. Haltung (Schultern)</span><label class="switch"><input type="checkbox" id="modPosture"><span class="slider"></span></label></div>
+            <button onclick="startApp()" style="width:100%; padding:15px; border:none; background:#007aff; color:white; border-radius:10px; font-weight:bold;">START</button>
         </div>
 
-        <!-- ACTIVE APP SCREEN -->
-        <div id="activeScreen" style="display: none;">
-            <div id="status" class="status-message">Kamera initialisieren...</div>
-            <div id="timer" class="timer-display">00:00</div>
-            
+        <!-- AKTIV -->
+        <div id="activeScreen">
+            <div id="status" style="margin-bottom:10px; font-weight:bold;">Starte...</div>
             <div class="camera-box" id="camContainer">
                 <video id="webcam" autoplay playsinline muted style="display:none;"></video>
                 <canvas id="processingCanvas"></canvas>
-                
-                <div id="circleNose" class="joint-indicator"></div>
-                <div id="circleLeftShoulder" class="joint-indicator"></div>
-                <div id="circleRightShoulder" class="joint-indicator"></div>
-                <div id="circleLeftWrist" class="joint-indicator"></div>
-                <div id="circleRightWrist" class="joint-indicator"></div>
+                <div id="ptNose" class="joint-indicator"></div>
+                <div id="ptLShoulder" class="joint-indicator"></div>
+                <div id="ptRShoulder" class="joint-indicator"></div>
             </div>
         </div>
     </div>
 
     <script>
-        const setupScreen = document.getElementById('setupScreen');
-        const activeScreen = document.getElementById('activeScreen');
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('processingCanvas');
-        const ctx = canvas.getContext('2d');
-        const container = document.getElementById('camContainer');
-        const timerDisplay = document.getElementById('timer');
-        const status = document.getElementById('status');
-
-        const joints = {
-            nose: document.getElementById('circleNose'),
-            leftShoulder: document.getElementById('circleLeftShoulder'),
-            rightShoulder: document.getElementById('circleRightShoulder'),
-            leftWrist: document.getElementById('circleLeftWrist'),
-            rightWrist: document.getElementById('circleRightWrist')
-        };
-
-        let timeLeftInSeconds = 0;
-        let isPrepared = false;
-        let prepCountdown = 12; // 12 Sekunden Vorbereitungszeit
-        let clockInterval = null;
-        let net = null;
-
-        function formatTime(totalSeconds) {
-            const mins = Math.floor(totalSeconds / 60);
-            const secs = totalSeconds % 60;
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
+        let net, video = document.getElementById('webcam'), canvas = document.getElementById('processingCanvas');
+        let ctx = canvas.getContext('2d'), container = document.getElementById('camContainer');
+        let pts = { nose: document.getElementById('ptNose'), lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder') };
 
         async function startApp() {
-            const inputMinutes = parseInt(document.getElementById('durationInput').value) || 5;
-            timeLeftInSeconds = inputMinutes * 60;
-
-            setupScreen.style.display = 'none';
-            activeScreen.style.display = 'block';
-            timerDisplay.innerText = formatTime(timeLeftInSeconds);
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } 
-                });
-                video.srcObject = stream;
-                
-                video.onloadedmetadata = async () => {
-                    status.innerText = "Lade KI-Wächter...";
-                    net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.50 });
-                    
-                    // Render-Loop für das quadratische Video
-                    function videoLoop() {
-                        canvas.width = 257; canvas.height = 257;
-                        const minDim = Math.min(video.videoWidth, video.videoHeight);
-                        const sx = (video.videoWidth - minDim) / 2;
-                        const sy = (video.videoHeight - minDim) / 2;
-
-                        ctx.save();
-                        ctx.translate(257, 0); ctx.scale(-1, 1);
-                        ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, 257, 257);
-                        ctx.restore();
-                        requestAnimationFrame(videoLoop);
-                    }
-                    videoLoop();
-
-                    // Starte den logischen Herzschlag der App (jede Sekunde)
-                    clockInterval = setInterval(appTick, 1000);
-                };
-            } catch(e) {
-                status.innerText = "Kamerafehler!";
-            }
+            document.getElementById('setupScreen').style.display = 'none';
+            document.getElementById('activeScreen').style.display = 'block';
+            
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            net = await posenet.load();
+            
+            loop();
+            setInterval(checkRules, 500); // Check-Intervall
         }
 
-        async function appTick() {
-            // PHASE 1: VORBEREITUNG
-            if (!isPrepared) {
-                prepCountdown--;
-                status.innerText = `In Position gehen! Hände hoch! ${prepCountdown}s...`;
-                status.style.color = "#ffaa00";
-                if (prepCountdown <= 0) {
-                    isPrepared = true;
-                    status.innerText = "Überwachung aktiv. Stillstehen!";
-                    status.style.color = "#28a745";
-                }
-                return;
-            }
+        function loop() {
+            canvas.width = 257; canvas.height = 257;
+            const minDim = Math.min(video.videoWidth, video.videoHeight);
+            const sx = (video.videoWidth - minDim) / 2;
+            const sy = (video.videoHeight - minDim) / 2;
+            ctx.save(); ctx.translate(257, 0); ctx.scale(-1, 1);
+            ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, 257, 257);
+            ctx.restore();
+            requestAnimationFrame(loop);
+        }
 
-            // PHASE 2: ÜBERWACHUNG (KI auslesen)
-            if (net && video.readyState >= 2) {
-                try {
-                    const pose = await net.estimateSinglePose(canvas);
-                    
-                    // Hilfsfunktion zum Platzieren der Punkte auf dem Display
-                    function track(partName, element) {
-                        const kp = pose.keypoints.find(k => k.part === partName);
-                        if (kp && kp.score > 0.25) {
-                            element.style.left = `${(kp.position.x / 257) * container.clientWidth}px`;
-                            element.style.top = `${(kp.position.y / 257) * container.clientHeight}px`;
-                            element.style.display = 'block';
-                            return kp;
-                        }
-                        element.style.display = 'none';
-                        return null;
-                    }
+        async function checkRules() {
+            const pose = await net.estimateSinglePose(canvas);
+            const n = pose.keypoints.find(k => k.part === 'nose'), lS = pose.keypoints.find(k => k.part === 'leftShoulder'), rS = pose.keypoints.find(k => k.part === 'rightShoulder');
 
-                    const nose = track('nose', joints.nose);
-                    const lShoulder = track('leftShoulder', joints.leftShoulder);
-                    const rShoulder = track('rightShoulder', joints.rightShoulder);
-                    const lWrist = track('leftWrist', joints.leftWrist);
-                    const rWrist = track('rightWrist', joints.rightWrist);
+            // Visuelle Punkte aktualisieren
+            [n, lS, rS].forEach((p, i) => {
+                let el = Object.values(pts)[i];
+                if(p && p.score > 0.3) {
+                    el.style.left = `${(p.position.x/257)*container.clientWidth}px`;
+                    el.style.top = `${(p.position.y/257)*container.clientHeight}px`;
+                    el.style.display = 'block';
+                } else el.style.display = 'none';
+            });
 
-                    let violation = false;
-
-                    // 1. Check: Anti-Cheat (Person komplett weg?)
-                    if (!lShoulder || !rShoulder) {
-                        timeLeftInSeconds += 15; // +15 Sekunden Strafe
-                        container.className = "camera-box cheat-violation";
-                        status.innerText = "ANTI-CHEAT: Bitte an die Wand! +15s";
-                        status.style.color = "#ff3333";
-                        timerDisplay.style.color = "#ff3333";
-                        violation = true;
-                    } 
-                    // 2. Check: Hände auf Kopfhöhe?
-                    else if (lWrist && rWrist && nose) {
-                        // In der KI-Welt bedeutet ein "kleinerer" Y-Wert, dass der Punkt HÖHER im Bild ist.
-                        // Wenn das Handgelenk-Y also GRÖSSER ist als das Nasen-Y, hängt die Hand darunter!
-                        if (lWrist.position.y > nose.position.y || rWrist.position.y > nose.position.y) {
-                            timeLeftInSeconds += 10; // +10 Sekunden Strafe
-                            container.className = "camera-box hands-violation";
-                            status.innerText = "HÄNDE UNTEN! Höher nehmen! +10s";
-                            status.style.color = "#3399ff";
-                            timerDisplay.style.color = "#3399ff";
-                            violation = true;
-                        }
-                    }
-
-                    // Wenn alles perfekt ist, setze den Kasten wieder auf grün/normal zurück
-                    if (!violation) {
-                        container.className = "camera-box";
-                        status.innerText = "Überwachung aktiv. Disziplin halten. 🟢";
-                        status.style.color = "#28a745";
-                        timerDisplay.style.color = "#ffffff";
-                    }
-
-                } catch(err) {
-                    console.error(err);
-                }
-            }
-
-            // Countdown herunterzählen
-            timeLeftInSeconds--;
-            timerDisplay.innerText = formatTime(timeLeftInSeconds);
-
-            // Ziel erreicht!
-            if (timeLeftInSeconds <= 0) {
-                clearInterval(clockInterval);
-                status.innerText = "Geschafft! Ausgezeichnete Disziplin. 🏆";
-                status.style.color = "#007aff";
-                timerDisplay.innerText = "DONE";
-                timerDisplay.style.color = "#007aff";
-                
-                // Punkte ausblenden
-                Object.values(joints).forEach(el => el.style.display = 'none');
-                if (video.srcObject) {
-                    video.srcObject.getTracks().forEach(track => track.stop());
-                }
-            }
+            // Modul-Logik hier einbauen (z.B. if(document.getElementById('modHands').checked) { ... })
+            document.getElementById('status').innerText = "Wächter aktiv...";
         }
     </script>
 </body>
