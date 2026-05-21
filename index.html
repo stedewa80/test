@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Profile Architecture</title>
+    <title>CornerTime - Wächter Pro</title>
     <style>
         body { 
             background-color: #121212; color: #fff; 
@@ -16,7 +16,6 @@
         h2 { text-align: center; margin-top: 0; color: #00ffcc; }
         .option-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 1px solid #333; padding-bottom: 12px; }
         
-        /* Dropdown Styling */
         select.profile-select {
             width: 100%; background: #2a2a2a; color: #fff; border: 2px solid #007aff;
             padding: 12px; border-radius: 10px; font-size: 1rem; font-weight: bold;
@@ -48,7 +47,6 @@
         <div id="setupScreen" class="setup-screen">
             <h2>Wächter-Profil</h2>
             
-                        <!-- Profil-Auswahl-Menü -->
             <label for="profileSelect" style="display:block; font-size:0.9rem; color:#aaa; margin-bottom:5px;">Übungs-Position:</label>
             <select id="profileSelect" class="profile-select">
                 <option value="STEHEND_RECK">1. Stehend (Hände über Kopf)</option>
@@ -74,13 +72,13 @@
                 <div id="ptLWrist" class="joint-indicator"></div>
                 <div id="ptRWrist" class="joint-indicator"></div>
                 <div id="ptLElbow" class="joint-indicator" style="border: 4px solid #ff00ff; background: rgba(255,0,255,0.2);"></div>
-                <div id="ptREElbow" class="joint-indicator" style="border: 4px solid #ff00ff; background: rgba(255,0,255,0.2);"></div>                
+                <div id="ptREElbow" class="joint-indicator" style="border: 4px solid #ff00ff; background: rgba(255,0,255,0.2);"></div>
             </div>
         </div>
     </div>
-    <!-- NÄCHSTE NACHRICHT FOLGT MIT TEIL 2 -->
+
     <script>
-        // --- DIE ERWEITERTE PROFIL-ARCHITEKTUR ---
+        // --- DIE PROFIL-ARCHITEKTUR ---
         const ACTIVE_PROFILES = {
             "STEHEND_RECK": {
                 joints: ['leftShoulder', 'rightShoulder', 'leftEar', 'rightEar', 'leftWrist', 'rightWrist'],
@@ -88,13 +86,11 @@
                 rules: { handsOverHead: true, handsBehindHead: false, armsBehindBack: false, checkPosture: true }
             },
             "HINTER_KOPF": {
-                // Hier überwachen wir zusätzlich die Ellbogen, da sie die Stabilität halten!
                 joints: ['leftShoulder', 'rightShoulder', 'leftEar', 'rightEar', 'leftElbow', 'rightElbow'],
                 limits: { leftShoulder: 10, rightShoulder: 10, leftEar: 10, rightEar: 10, leftElbow: 12, rightElbow: 12 },
                 rules: { handsOverHead: false, handsBehindHead: true, armsBehindBack: false, checkPosture: true }
             },
             "HINTER_RUECKEN": {
-                // Hüfte wird hier zum wichtigen Ankerpunkt für die Arme
                 joints: ['leftShoulder', 'rightShoulder', 'leftHip', 'rightHip', 'leftElbow', 'rightElbow'],
                 limits: { leftShoulder: 11, rightShoulder: 11, leftHip: 10, rightHip: 10, leftElbow: 14, rightElbow: 14 },
                 rules: { handsOverHead: false, handsBehindHead: false, armsBehindBack: true, checkPosture: true }
@@ -108,7 +104,7 @@
         const pts = { head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist'), lE: document.getElementById('ptLElbow'), rE: document.getElementById('ptREElbow') };
 
         let net = null, prevPose = null, anchorPose = {}, isPrepared = false, latestKeypoints = null; 
-        let timeRemainingSeconds = 300, workoutInterval = null, movementDetectedTime = null, isGracePeriodActive = false, lastSpokenTime = 0;
+        let timeRemainingSeconds = 300, workoutInterval = null, movementDetectedTime = null, isGracePeriodActive = false, lastSpokenTime = 0, errorCounter = 0;
 
         function speak(text, force = false) {
             try {
@@ -124,12 +120,9 @@
             timerDisplay.innerText = `${mins}:${secs}`;
         }
 
-        // Helfer-Funktion für die Gelenk-Sichtbarkeit
         function f(part) { return latestKeypoints && latestKeypoints[part] && latestKeypoints[part].score > 0.25; }
 
-        // --- DEINE GEOMETRISCHEN REGELN (ZENTRAL GEBÜNDELT) ---
         function validatePositionConditions() {
-            // Regel 1: Klassisch Hände hoch
             if (document.getElementById('modHands').checked && currentProfile.rules.handsOverHead) {
                 if (!f('leftEar') || !f('rightEar') || !f('leftWrist') || !f('rightWrist')) return false;
                 const lW = latestKeypoints.leftWrist.position, rW = latestKeypoints.rightWrist.position;
@@ -138,22 +131,16 @@
                 if (lW.y > headY || rW.y > headY) return false; 
             }
             
-            // Regel 2: Hände hinter dem Kopf (Ellbogen-Check)
             if (document.getElementById('modHands').checked && currentProfile.rules.handsBehindHead) {
                 if (!f('leftShoulder') || !f('rightShoulder') || !f('leftElbow') || !f('rightElbow')) return false;
-                // Ellbogen müssen weiter außen sein als die Schultern (X-Achse im gespiegelten Bild beachten)
-                // Bei korrekter Haltung ist der Abstand Ellbogen-Links zu Ellbogen-Rechts deutlich größer als Schulter zu Schulter
                 const shoulderDist = Math.abs(latestKeypoints.leftShoulder.position.x - latestKeypoints.rightShoulder.position.x);
                 const elbowDist = Math.abs(latestKeypoints.leftElbow.position.x - latestKeypoints.rightElbow.position.x);
-                if (elbowDist < (shoulderDist * 1.3)) return false; // Sacken die Ellbogen nach vorne, wird das Verhältnis kleiner
+                if (elbowDist < (shoulderDist * 1.3)) return false; 
             }
 
-            // Regel 3: Arme hinter dem Rücken verschränkt
             if (document.getElementById('modHands').checked && currentProfile.rules.armsBehindBack) {
-                // PoseNet verliert hier oft die Handgelenke (da verdeckt). Wir prüfen deshalb die Ellbogen-Tiefe relativ zur Schulter!
                 if (!f('leftShoulder') || !f('rightShoulder') || !f('leftElbow') || !f('rightElbow')) return false;
                 const avgShoulderY = (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y) / 2;
-                // Die Ellbogen müssen zwingend weit unterhalb der Schultern bleiben (großer Y-Wert)
                 if (latestKeypoints.leftElbow.position.y < (avgShoulderY + 50) || latestKeypoints.rightElbow.position.y < (avgShoulderY + 50)) return false;
             }
 
@@ -176,17 +163,15 @@
                 video.srcObject = stream;
                 video.onloadedmetadata = async () => {
                     status.innerText = "Lade schnelles KI-Modell...";
-                    net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.50 });
+                    net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 513, multiplier: 1.01 });
                     status.innerText = "In Position gehen! (5s)"; status.style.color = "#ffaa00"; speak("In Position gehen", true);
                     loop();
                     
-                    // Start-Schleife: Wächter schaltet erst ein, wenn du richtig stehst!
                     setTimeout(() => {
                         if (f('leftShoulder') && f('rightShoulder') && validatePositionConditions()) { 
                             initWorkout(); 
                         } else {
-                            status.innerText = "Bitte korrekte Haltung einnehmen (Hände hoch!)..."; 
-                            status.style.color = "#ff3333";
+                            status.innerText = "Bitte korrekte Haltung einnehmen..."; status.style.color = "#ff3333";
                             let retryAnchor = setInterval(() => { 
                                 if (f('leftShoulder') && f('rightShoulder') && validatePositionConditions()) { 
                                     initWorkout(); clearInterval(retryAnchor); 
@@ -194,13 +179,13 @@
                             }, 1000);
                         }
                     }, 5000);
-                    setInterval(checkRules, 350);
+                    setInterval(checkRules, 1000);
                 };
             } catch(e) { status.innerText = "Kamerafehler! Berechtigungen prüfen."; status.style.color = "red"; }
         }
 
         function initWorkout() {
-            setNewAnchor("Wächter aktiv");
+            setNewAnchor("Wächter active");
             workoutInterval = setInterval(() => {
                 if (isPrepared && !isGracePeriodActive) {
                     timeRemainingSeconds--; updateTimerUI();
@@ -217,7 +202,7 @@
             currentProfile.joints.forEach(jointName => {
                 if (f(jointName)) { anchorPose[jointName] = { x: latestKeypoints[jointName].position.x, y: latestKeypoints[jointName].position.y }; }
             });
-            isPrepared = true; isGracePeriodActive = false; movementDetectedTime = null;
+            isPrepared = true; isGracePeriodActive = false; movementDetectedTime = null; errorCounter = 0;
             status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333";
             if (audioMessage) speak(audioMessage, true);
         }
@@ -237,20 +222,22 @@
             latestKeypoints = {};
             pose.keypoints.forEach(k => { latestKeypoints[k.part] = k; });
 
-            // UI Indikatoren zeichnen
             const draw = (el, part) => { if (f(part)) { el.style.left = `${(latestKeypoints[part].position.x / 257) * container.clientWidth}px`; el.style.top = `${(latestKeypoints[part].position.y / 257) * container.clientHeight}px`; el.style.display = 'block'; } else { el.style.display = 'none'; } };
             draw(pts.lS, 'leftShoulder'); draw(pts.rS, 'rightShoulder'); draw(pts.lW, 'leftWrist'); draw(pts.rW, 'rightWrist');
-            draw(pts.lE, 'leftElbow'); draw(pts.rE, 'rightElbow'); // NEU: Zeichnet die lila Ellbogen-Punkte
+            draw(pts.lE, 'leftElbow'); draw(pts.rE, 'rightElbow');
+            if (f('leftEar') && f('rightEar')) { pts.head.style.left = `${(((latestKeypoints.leftEar.position.x + latestKeypoints.rightEar.position.x)/2) / 257) * container.clientWidth}px`; pts.head.style.top = `${(((latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y)/2) / 257) * container.clientHeight}px`; pts.head.style.display = 'block'; } else { pts.head.style.display = 'none'; }
 
             if (!isPrepared || !anchorPose || !currentProfile) return;
 
-            // --- ANTI-CHEAT ---
             if (document.getElementById('modPresence').checked && (!f('leftShoulder') || !f('rightShoulder'))) {
-                status.innerText = "ANTI-CHEAT: Keine Person erkannt! 🔴"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; speak("Workout abgebrochen", true);
-                clearInterval(workoutInterval); isPrepared = false; return;
+                errorCounter++;
+                if (errorCounter >= 2) {
+                    status.innerText = "ANTI-CHEAT: Keine Person erkannt! 🔴"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; speak("Workout abgebrochen", true);
+                    clearInterval(workoutInterval); isPrepared = false;
+                }
+                return;
             }
 
-            // --- LIVE-ÜBERWACHUNG ---
             if (document.getElementById('modAnchor').checked) {
                 let positionShifted = false;
 
@@ -262,21 +249,28 @@
                     }
                 });
 
-                if (positionShifted || isGracePeriodActive) {
-                    const now = Date.now();
-                    if (!isGracePeriodActive) { isGracePeriodActive = true; movementDetectedTime = now; speak("Korrigiere", true); }
-                    const remainingSeconds = 3 - Math.floor((now - movementDetectedTime) / 1000);
+                if (positionShifted || !validatePositionConditions()) {
+                    errorCounter++;
+                    
+                    if (errorCounter >= 2 || isGracePeriodActive) {
+                        const now = Date.now();
+                        if (!isGracePeriodActive) { isGracePeriodActive = true; movementDetectedTime = now; speak("Korrigiere", true); }
+                        const remainingSeconds = 3 - Math.floor((now - movementDetectedTime) / 1000);
 
-                    if (remainingSeconds > 0) {
-                        status.innerText = `KORREKTURZEIT! Noch ${remainingSeconds}s... ⏳`; status.style.color = "#ffaa00"; timerDisplay.style.color = "#ffaa00"; container.style.borderColor = "#ffaa00"; speak(remainingSeconds.toString());
-                    } else {
-                        if (validatePositionConditions()) { setNewAnchor("Checkpoint"); } 
-                        else {
-                            timeRemainingSeconds += 10; updateTimerUI(); speak("Strafe plus zehn Sekunden", true);
-                            movementDetectedTime = Date.now(); status.innerText = "HALTUNG FALSCH! +10s! Erneuter Versuch... ⏳"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333";
+                        if (remainingSeconds > 0) {
+                            status.innerText = `KORREKTURZEIT! Noch ${remainingSeconds}s... ⏳`; status.style.color = "#ffaa00"; timerDisplay.style.color = "#ffaa00"; container.style.borderColor = "#ffaa00"; speak(remainingSeconds.toString());
+                        } else {
+                            if (validatePositionConditions()) { setNewAnchor("Checkpoint"); } 
+                            else {
+                                timeRemainingSeconds += 10; updateTimerUI(); speak("Strafe plus zehn Sekunden", true);
+                                movementDetectedTime = Date.now(); status.innerText = "HALTUNG FALSCH! +10s! Erneuter Versuch... ⏳"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333";
+                            }
                         }
                     }
-                } else { status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333"; }
+                } else { 
+                    errorCounter = 0;
+                    status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333"; 
+                }
             }
             prevPose = { shoulder: (f('leftShoulder') && f('rightShoulder')) ? { x: (latestKeypoints.leftShoulder.position.x + latestKeypoints.rightShoulder.position.x)/2, y: (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y)/2 } : null };
         }
