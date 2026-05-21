@@ -6,106 +6,37 @@
     <title>CornerTime - 5-Min Countdown Guardian</title>
     <style>
         body { 
-            background-color: #121212; 
-            color: #fff; 
+            background-color: #121212; color: #fff; 
             font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            min-height: 100vh; 
-            margin: 0; 
-            padding: 20px; 
-            box-sizing: border-box; 
+            display: flex; flex-direction: column; align-items: center; 
+            justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; 
         }
-        
         .app-container { width: 100%; max-width: 400px; text-align: center; }
-        
-        /* Setup-Bildschirm */
-        .setup-screen { 
-            background: #1e1e1e; 
-            padding: 25px; 
-            border-radius: 20px; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5); 
-            text-align: left; 
-        }
+        .setup-screen { background: #1e1e1e; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: left; }
         h2 { text-align: center; margin-top: 0; color: #00ffcc; }
-        
-        .option-row { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            margin-bottom: 18px; 
-            border-bottom: 1px solid #333; 
-            padding-bottom: 12px; 
-        }
-        
-        /* iOS-Style Switch */
+        .option-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 1px solid #333; padding-bottom: 12px; }
         .switch { position: relative; display: inline-block; width: 46px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { 
-            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; 
-            background-color: #444; transition: .3s; border-radius: 26px; 
-        }
-        .slider:before { 
-            position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; 
-            background-color: white; transition: .3s; border-radius: 50%; 
-        }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .3s; border-radius: 26px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .3s; border-radius: 50%; }
         input:checked + .slider { background-color: #007aff; }
         input:checked + .slider:before { transform: translateX(20px); }
-        
-        /* Große Zeitanzeige */
-        .timer-display {
-            font-size: 3.5rem;
-            font-weight: 800;
-            color: #ffffff;
-            margin-bottom: 5px;
-            font-variant-numeric: tabular-nums;
-            transition: color 0.3s;
-        }
-        
-        /* Aktiver Bildschirm */
+        .timer-display { font-size: 3.5rem; font-weight: 800; color: #ffffff; margin-bottom: 5px; font-variant-numeric: tabular-nums; transition: color 0.3s; }
         #activeScreen { display: none; width: 100%; }
         .status-message { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; min-height: 2rem; color: #00ffcc; text-align: center; }
-        
-        /* Gehäuse */
-        .camera-box { 
-            width: 100%; 
-            border-radius: 20px; 
-            border: 8px solid #333333; 
-            overflow: hidden; 
-            background: #000000; 
-            position: relative; 
-            aspect-ratio: 1 / 1;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        
+        .camera-box { width: 100%; border-radius: 20px; border: 8px solid #333333; overflow: hidden; background: #000000; position: relative; aspect-ratio: 1 / 1; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: border-color 0.2s, box-shadow 0.2s; }
         canvas#processingCanvas { display: block; width: 100%; height: 100%; object-fit: cover; }
-        
-        /* HTML-Indikatoren */
-        .joint-indicator { 
-            position: absolute; width: 25px; height: 25px; border-radius: 50%; 
-            pointer-events: none; display: none; z-index: 9999; transform: translate(-50%, -50%); 
-            transition: left 0.05s linear, top 0.05s linear;
-        }
+        .joint-indicator { position: absolute; width: 25px; height: 25px; border-radius: 50%; pointer-events: none; display: none; z-index: 9999; transform: translate(-50%, -50%); transition: left 0.05s linear, top 0.05s linear; }
         #ptHead { border: 4px solid #00ffcc; background: rgba(0,255,204,0.2); }
         #ptLShoulder, #ptRShoulder { border: 4px solid #28a745; background: rgba(40,167,69,0.2); }
         #ptLWrist, #ptRWrist { border: 4px solid #3399ff; background: rgba(51,153,255,0.2); }
-        
-        button.start-btn { 
-            background: #007aff; color: white; border: none; padding: 16px; 
-            font-size: 1.2rem; font-weight: bold; border-radius: 12px; 
-            cursor: pointer; margin-top: 10px; width: 100%; box-shadow: 0 4px 10px rgba(0,122,255,0.3);
-        }
+        button.start-btn { background: #007aff; color: white; border: none; padding: 16px; font-size: 1.2rem; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 10px; width: 100%; box-shadow: 0 4px 10px rgba(0,122,255,0.3); }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
 </head>
 <body>
-
     <div class="app-container">
-        <!-- SETUP SCREEN -->
         <div id="setupScreen" class="setup-screen">
             <h2>Wächter-Konfig</h2>
             <div class="option-row"><span>1. Dynamische Checkpoints</span><label class="switch"><input type="checkbox" id="modAnchor" checked><span class="slider"></span></label></div>
@@ -114,18 +45,12 @@
             <div class="option-row"><span>4. Haltung (Schulter-Neigung)</span><label class="switch"><input type="checkbox" id="modPosture"><span class="slider"></span></label></div>
             <button class="start-btn" onclick="startApp()">ÜBERWACHUNG STARTEN</button>
         </div>
-
-        <!-- ACTIVE APP SCREEN -->
         <div id="activeScreen">
-            <!-- Große Stoppuhr (Herunterzählend) -->
             <div id="timerDisplay" class="timer-display">05:00</div>
             <div id="status" class="status-message">Kamera initialisieren...</div>
-            
             <div class="camera-box" id="camContainer">
                 <video id="webcam" autoplay playsinline muted style="display:none;"></video>
                 <canvas id="processingCanvas"></canvas>
-                
-                <!-- Live-Tracking-Punkte -->
                 <div id="ptHead" class="joint-indicator"></div>
                 <div id="ptLShoulder" class="joint-indicator"></div>
                 <div id="ptRShoulder" class="joint-indicator"></div>
@@ -134,8 +59,8 @@
             </div>
         </div>
     </div>
-
-    <script>
+    <!-- HIER FOLGT JETZT DAS SKRIPT AUS TEIL 2 -->
+        <script>
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('processingCanvas');
         const ctx = canvas.getContext('2d');
@@ -144,38 +69,21 @@
         const timerDisplay = document.getElementById('timerDisplay');
 
         const pts = {
-            head: document.getElementById('ptHead'),
-            lS: document.getElementById('ptLShoulder'),
-            rS: document.getElementById('ptRShoulder'),
-            lW: document.getElementById('ptLWrist'),
-            rW: document.getElementById('ptRWrist')
+            head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'),
+            rS: document.getElementById('ptRShoulder'), lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist')
         };
 
-        let net = null;
-        let prevPose = null;   
-        let anchorPose = null; 
-        let isPrepared = false;
-        let latestKeypoints = null; 
-
-        // --- ZEIT-VARIABLEN ---
-        let timeRemainingSeconds = 300; // Start bei 5 Minuten (300 Sekunden)
-        let workoutInterval = null;     
-        let movementDetectedTime = null;
-        let isGracePeriodActive = false;
-        let lastSpokenTime = 0;
+        let net = null, prevPose = null, anchorPose = null, isPrepared = false, latestKeypoints = null; 
+        let timeRemainingSeconds = 300, workoutInterval = null, movementDetectedTime = null, isGracePeriodActive = false, lastSpokenTime = 0;
 
         function speak(text, force = false) {
-            const now = Date.now();
-            if (!force && (now - lastSpokenTime < 1200)) return; 
-            lastSpokenTime = now;
-            
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'de-DE';
-            utterance.rate = 1.3;
-            window.speechSynthesis.speak(utterance);
+            try {
+                const now = Date.now(); if (!force && (now - lastSpokenTime < 1200)) return; lastSpokenTime = now;
+                const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'de-DE'; utterance.rate = 1.3;
+                window.speechSynthesis.speak(utterance);
+            } catch (e) { console.log("Audiofehler abgefangen:", e); }
         }
 
-        // Formatiert verbleibende Sekunden in MM:SS
         function updateTimerUI() {
             if (timeRemainingSeconds < 0) timeRemainingSeconds = 0;
             const mins = Math.floor(timeRemainingSeconds / 60).toString().padStart(2, '0');
@@ -184,74 +92,40 @@
         }
 
         async function startApp() {
-            // FIX: Aktiviert Audio-Schnittstelle zwingend im Klick-Event, bevor der Stream startet
-            try {
-                window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
-            } catch(audioErr) {
-                console.log("Audio-Init verzögert");
-            }
-
             document.getElementById('setupScreen').style.display = 'none';
             document.getElementById('activeScreen').style.display = 'block';
-            updateTimerUI(); // Initialisiere die 5:00 Anzeige
-            
+            updateTimerUI(); 
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } 
-                });
+                status.innerText = "Kamera-Zugriff anfordern...";
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
                 video.srcObject = stream;
-                
                 video.onloadedmetadata = async () => {
                     status.innerText = "Lade schnelles KI-Modell...";
                     net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.50 });
-                    
-                    status.innerText = "In Position gehen! (5s)";
-                    status.style.color = "#ffaa00";
-                    speak("In Position gehen");
-                    
+                    status.innerText = "In Position gehen! (5s)"; status.style.color = "#ffaa00"; speak("In Position gehen", true);
                     loop();
-                    
                     setTimeout(() => {
-                        if (latestKeypoints && latestKeypoints.foundLShoulder && latestKeypoints.foundRShoulder) {
-                            initWorkout();
-                        } else {
-                            status.innerText = "Bitte SICHTBAR vor die Wand stellen...";
-                            status.style.color = "#ff3333";
+                        if (latestKeypoints && latestKeypoints.foundLShoulder && latestKeypoints.foundRShoulder) { initWorkout(); } 
+                        else {
+                            status.innerText = "Bitte SICHTBAR vor die Wand stellen..."; status.style.color = "#ff3333";
                             let retryAnchor = setInterval(() => {
-                                if (latestKeypoints && latestKeypoints.foundLShoulder && latestKeypoints.foundRShoulder) {
-                                    initWorkout();
-                                    clearInterval(retryAnchor);
-                                }
+                                if (latestKeypoints && latestKeypoints.foundLShoulder && latestKeypoints.foundRShoulder) { initWorkout(); clearInterval(retryAnchor); }
                             }, 1000);
                         }
                     }, 5000);
-
                     setInterval(checkRules, 350);
                 };
-            } catch(e) {
-                status.innerText = "Kamerafehler! Berechtigungen prüfen.";
-                status.style.color = "red";
-            }
+            } catch(e) { status.innerText = "Kamerafehler! Berechtigungen prüfen."; status.style.color = "red"; }
         }
 
         function initWorkout() {
             setNewAnchor("Wächter aktiv");
-            
-            // Gesamt-Countdown tickt jede Sekunde herunter (außer im Korrekturmodus)
             workoutInterval = setInterval(() => {
                 if (isPrepared && !isGracePeriodActive) {
-                    timeRemainingSeconds--;
-                    updateTimerUI();
-
-                    // Erfolg! Zeit ist abgelaufen
+                    timeRemainingSeconds--; updateTimerUI();
                     if (timeRemainingSeconds <= 0) {
-                        clearInterval(workoutInterval);
-                        isPrepared = false;
-                        status.innerText = "TRAINING BEENDET! Ausgezeichnet! 🎉";
-                        status.style.color = "#00ffcc";
-                        timerDisplay.style.color = "#00ffcc";
-                        container.style.borderColor = "#00ffcc";
-                        speak("Training beendet. Ausgezeichnet.");
+                        clearInterval(workoutInterval); isPrepared = false;
+                        status.innerText = "TRAINING BEENDET! 🎉"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#00ffcc"; speak("Training beendet. Ausgezeichnet.", true);
                     }
                 }
             }, 1000);
@@ -259,180 +133,96 @@
 
         function setNewAnchor(audioMessage) {
             anchorPose = {
-                shoulder: {
-                    x: (latestKeypoints.lS.position.x + latestKeypoints.rS.position.x) / 2,
-                    y: (latestKeypoints.lS.position.y + latestKeypoints.rS.position.y) / 2
-                },
-                head: (latestKeypoints.foundLeftEar && latestKeypoints.foundRightEar) ? {
-                    x: (latestKeypoints.lE.position.x + latestKeypoints.rE.position.x) / 2,
-                    y: (latestKeypoints.lE.position.y + latestKeypoints.rE.position.y) / 2
-                } : null,
+                shoulder: { x: (latestKeypoints.lS.position.x + latestKeypoints.rS.position.x) / 2, y: (latestKeypoints.lS.position.y + latestKeypoints.rS.position.y) / 2 },
+                head: (latestKeypoints.foundLeftEar && latestKeypoints.foundRightEar) ? { x: (latestKeypoints.lE.position.x + latestKeypoints.rE.position.x) / 2, y: (latestKeypoints.lE.position.y + latestKeypoints.rE.position.y) / 2 } : null,
                 lWrist: latestKeypoints.foundLWrist ? { x: latestKeypoints.lW.position.x, y: latestKeypoints.lW.position.y } : null,
                 rWrist: latestKeypoints.foundRWrist ? { x: latestKeypoints.rW.position.x, y: latestKeypoints.rW.position.y } : null
             };
-
-            isPrepared = true;
-            isGracePeriodActive = false;
-            movementDetectedTime = null;
-            status.innerText = "Überwachung aktiv! 🟢";
-            status.style.color = "#00ffcc";
-            timerDisplay.style.color = "#ffffff";
-            container.style.borderColor = "#333333";
+            isPrepared = true; isGracePeriodActive = false; movementDetectedTime = null;
+            status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333";
             if (audioMessage) speak(audioMessage, true);
         }
 
         function loop() {
             canvas.width = 257; canvas.height = 257;
             const minDim = Math.min(video.videoWidth, video.videoHeight);
-            const sx = (video.videoWidth - minDim) / 2;
-            const sy = (video.videoHeight - minDim) / 2;
-
-            ctx.save();
-            ctx.translate(257, 0); ctx.scale(-1, 1);
-            ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, 257, 257);
-            ctx.restore();
+            const sx = (video.videoWidth - minDim) / 2, sy = (video.videoHeight - minDim) / 2;
+            ctx.save(); ctx.translate(257, 0); ctx.scale(-1, 1);
+            ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, 257, 257); ctx.restore();
             requestAnimationFrame(loop);
         }
 
         async function checkRules() {
             if (!net || video.readyState < 2) return;
-
             const pose = await net.estimateSinglePose(canvas);
-            
-            const lS = pose.keypoints.find(k => k.part === 'leftShoulder');
-            const rS = pose.keypoints.find(k => k.part === 'rightShoulder');
-            const lW = pose.keypoints.find(k => k.part === 'leftWrist');
-            const rW = pose.keypoints.find(k => k.part === 'rightWrist');
-            const lE = pose.keypoints.find(k => k.part === 'leftEar');
-            const rE = pose.keypoints.find(k => k.part === 'rightEar');
+            const lS = pose.keypoints.find(k => k.part === 'leftShoulder'), rS = pose.keypoints.find(k => k.part === 'rightShoulder');
+            const lW = pose.keypoints.find(k => k.part === 'leftWrist'), rW = pose.keypoints.find(k => k.part === 'rightWrist');
+            const lE = pose.keypoints.find(k => k.part === 'leftEar'), rE = pose.keypoints.find(k => k.part === 'rightEar');
 
-            const foundLShoulder = lS && lS.score > 0.25;
-            const foundRShoulder = rS && rS.score > 0.25;
-            const foundLWrist = lW && lW.score > 0.25;
-            const foundRWrist = rW && rW.score > 0.25;
-            const foundLeftEar = lE && lE.score > 0.25;
-            const foundRightEar = rE && rE.score > 0.25;
+            const foundLShoulder = lS && lS.score > 0.25, foundRShoulder = rS && rS.score > 0.25;
+            const foundLWrist = lW && lW.score > 0.25, foundRWrist = rW && rW.score > 0.25;
+            const foundLeftEar = lE && lE.score > 0.25, foundRightEar = rE && rE.score > 0.25;
 
             latestKeypoints = { lS, rS, lW, rW, lE, rE, foundLShoulder, foundRShoulder, foundLWrist, foundRWrist, foundLeftEar, foundRightEar };
 
-            // --- VISUELLE DIAGNOSE-PUNKTE PLATZIEREN ---
             function drawIndicator(element, kp, isVisible) {
                 if (isVisible) {
                     element.style.left = `${(kp.position.x / 257) * container.clientWidth}px`;
                     element.style.top = `${(kp.position.y / 257) * container.clientHeight}px`;
                     element.style.display = 'block';
-                } else {
-                    element.style.display = 'none';
-                }
+                } else { element.style.display = 'none'; }
             }
 
-            let mockHeadPoint = null;
-            if (foundLeftEar && foundRightEar) {
-                mockHeadPoint = { position: { x: (lE.position.x + rE.position.x) / 2, y: (lE.position.y + rE.position.y) / 2 } };
-            }
-            
-            drawIndicator(pts.head, mockHeadPoint, (foundLeftEar && foundRightEar));
-            drawIndicator(pts.lS, lS, foundLShoulder);
-            drawIndicator(pts.rS, rS, foundRShoulder);
-            drawIndicator(pts.lW, lW, foundLWrist);
-            drawIndicator(pts.rW, rW, foundRWrist);
+            let mockHeadPoint = null; if (foundLeftEar && foundRightEar) { mockHeadPoint = { position: { x: (lE.position.x + rE.position.x) / 2, y: (lE.position.y + rE.position.y) / 2 } }; }
+            drawIndicator(pts.head, mockHeadPoint, (foundLeftEar && foundRightEar)); drawIndicator(pts.lS, lS, foundLShoulder); drawIndicator(pts.rS, rS, foundRShoulder); drawIndicator(pts.lW, lW, foundLWrist); drawIndicator(pts.rW, rW, foundRWrist);
 
             if (!isPrepared || !anchorPose) return;
 
-            // --- HIERARCHIE SCHRITT 1: SOFORTIGER ABBRUCH BEI ABWESENHEIT ---
             if (document.getElementById('modPresence').checked && (!foundLShoulder || !foundRShoulder)) {
-                status.innerText = "ANTI-CHEAT: Keine Person erkannt! ABGEBROCHEN! 🔴";
-                status.style.color = "#ff3333";
-                container.style.borderColor = "#ff3333";
-                timerDisplay.style.color = "#ff3333";
-                speak("Workout abgebrochen", true);
-                
-                clearInterval(workoutInterval);
-                isPrepared = false;
-                return;
+                status.innerText = "ANTI-CHEAT: Keine Person erkannt! 🔴"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; speak("Workout abgebrochen", true);
+                clearInterval(workoutInterval); isPrepared = false; return;
             }
 
-            // --- BEDINGUNGS-VALIDIERUNG FÜR DEN SCHLUSS-CHECK ---
             function validatePositionConditions() {
                 if (document.getElementById('modHands').checked) {
                     if (!foundLeftEar || !foundRightEar || !foundLWrist || !foundRWrist) return false;
-                    const headY = (lE.position.y + rE.position.y) / 2;
-                    if (lW.position.y > headY || rW.position.y > headY) return false; 
+                    const headY = (lE.position.y + rE.position.y) / 2; if (lW.position.y > headY || rW.position.y > headY) return false; 
                 }
-                if (document.getElementById('modPosture').checked) {
-                    if (Math.abs(lS.position.y - rS.position.y) > 22) return false;
-                }
+                if (document.getElementById('modPosture').checked && Math.abs(lS.position.y - rS.position.y) > 22) return false;
                 if (prevPose) {
-                    const curX = (lS.position.x + rS.position.x)/2; const curY = (lS.position.y + rS.position.y)/2;
+                    const curX = (lS.position.x + rS.position.x)/2, curY = (lS.position.y + rS.position.y)/2;
                     if (Math.abs(curX - prevPose.shoulder.x) > 5 || Math.abs(curY - prevPose.shoulder.y) > 5) return false;
                 }
                 return true;
             }
 
-            // --- DYNAMISCHE POSITIONS-ÜBERWACHUNG ---
             if (document.getElementById('modAnchor').checked) {
                 let positionShifted = false;
-
                 if (foundLShoulder && foundRShoulder) {
-                    const shX = (lS.position.x + rS.position.x) / 2; const shY = (lS.position.y + rS.position.y) / 2;
+                    const shX = (lS.position.x + rS.position.x) / 2, shY = (lS.position.y + rS.position.y) / 2;
                     if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > 11) positionShifted = true;
                 }
-                if (foundLeftEar && foundRightEar && anchorPose.head) {
-                    const hdX = (lE.position.x + rE.position.x) / 2; const hdY = (lE.position.y + rE.position.y) / 2;
-                    if (Math.sqrt(Math.pow(hdX - anchorPose.head.x, 2) + Math.pow(hdY - anchorPose.head.y, 2)) > 11) positionShifted = true;
-                }
+                if (foundLeftEar && foundRightEar && anchorPose.head && Math.sqrt(Math.pow(((lE.position.x + rE.position.x)/2) - anchorPose.head.x, 2) + Math.pow(((lE.position.y + rE.position.y)/2) - anchorPose.head.y, 2)) > 11) positionShifted = true;
                 if (foundLWrist && anchorPose.lWrist && Math.sqrt(Math.pow(lW.position.x - anchorPose.lWrist.x, 2) + Math.pow(lW.position.y - anchorPose.lWrist.y, 2)) > 15) positionShifted = true;
                 if (foundRWrist && anchorPose.rWrist && Math.sqrt(Math.pow(rW.position.x - anchorPose.rWrist.x, 2) + Math.pow(rW.position.y - anchorPose.rWrist.y, 2)) > 15) positionShifted = true;
 
                 if (positionShifted || isGracePeriodActive) {
                     const now = Date.now();
-                    
-                    if (!isGracePeriodActive) {
-                        isGracePeriodActive = true;
-                        movementDetectedTime = now;
-                        speak("Korrigiere", true);
-                    }
-
-                    const elapsedSeconds = Math.floor((now - movementDetectedTime) / 1000);
-                    const remainingSeconds = 3 - elapsedSeconds;
+                    if (!isGracePeriodActive) { isGracePeriodActive = true; movementDetectedTime = now; speak("Korrigiere", true); }
+                    const remainingSeconds = 3 - Math.floor((now - movementDetectedTime) / 1000);
 
                     if (remainingSeconds > 0) {
-                        status.innerText = `KORREKTURZEIT! Noch ${remainingSeconds}s... ⏳`;
-                        status.style.color = "#ffaa00";
-                        timerDisplay.style.color = "#ffaa00";
-                        container.style.borderColor = "#ffaa00";
-                        speak(remainingSeconds.toString());
+                        status.innerText = `KORREKTURZEIT! Noch ${remainingSeconds}s... ⏳`; status.style.color = "#ffaa00"; timerDisplay.style.color = "#ffaa00"; container.style.borderColor = "#ffaa00"; speak(remainingSeconds.toString());
                     } else {
-                        // --- HIERARCHIE SCHRITT 2: ABRECHNUNG BEI NULL ---
-                        if (validatePositionConditions()) {
-                            setNewAnchor("Checkpoint"); 
-                        } else {
-                            // NEU: Strafsekunden VERLÄNGERN das Workout (+10 Sekunden addieren)
-                            timeRemainingSeconds += 10; 
-                            updateTimerUI();
-                            
-                            speak("Strafe plus zehn Sekunden", true);
-                            
-                            // Korrektur-Timer sofort zurücksetzen für eine neue 3-Sekunden-Chance
-                            movementDetectedTime = Date.now(); 
-                            status.innerText = "HALTUNG FALSCH! +10s! Erneuter Versuch... ⏳";
-                            status.style.color = "#ff3333";
-                            timerDisplay.style.color = "#ff3333";
-                            container.style.borderColor = "#ff3333";
+                        if (validatePositionConditions()) { setNewAnchor("Checkpoint"); } 
+                        else {
+                            timeRemainingSeconds += 10; updateTimerUI(); speak("Strafe plus zehn Sekunden", true);
+                            movementDetectedTime = Date.now(); status.innerText = "HALTUNG FALSCH! +10s! Erneuter Versuch... ⏳"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333";
                         }
                     }
-                } else {
-                    // Normaler stabiler grüner Zustand
-                    status.innerText = "Überwachung aktiv! 🟢";
-                    status.style.color = "#00ffcc";
-                    timerDisplay.style.color = "#ffffff";
-                    container.style.borderColor = "#333333";
-                }
+                } else { status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333"; }
             }
-
-            prevPose = {
-                shoulder: (foundLShoulder && foundRShoulder) ? { x: (lS.position.x + rS.position.x)/2, y: (lS.position.y + rS.position.y)/2 } : null
-            };
+            prevPose = { shoulder: (foundLShoulder && foundRShoulder) ? { x: (lS.position.x + rS.position.x)/2, y: (lS.position.y + rS.position.y)/2 } : null };
         }
     </script>
 </body>
