@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - MediaPipe Wächter</title>
+    <title>CornerTime - MediaPipe Local Fix</title>
     <style>
         body { 
             background-color: #121212; color: #fff; 
@@ -34,11 +34,11 @@
         button.start-btn { background: #007aff; color: white; border: none; padding: 16px; font-size: 1.2rem; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 10px; width: 100%; box-shadow: 0 4px 10px rgba(0,122,255,0.3); }
     </style>
     
-    <!-- Die neuen, modernen MediaPipe & TensorFlow Bibliotheken -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    <!-- Einzelne Scripte, die stabil nacheinander laden -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.20.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.20.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3"></script>
 </head>
 <body>
     <div class="app-container">
@@ -87,14 +87,13 @@
             timerDisplay.innerText = `${mins}:${secs}`;
         }
 
-        function f(part) { return latestKeypoints && latestKeypoints[part] && latestKeypoints[part].score > 0.4; }
+        function f(part) { return latestKeypoints && latestKeypoints[part] && latestKeypoints[part].score > 0.35; }
 
         function validatePositionConditions() {
             if (document.getElementById('modHands').checked) {
                 if (!f('left_ear') || !f('right_ear') || !f('left_wrist') || !f('right_wrist')) return false;
-                const lW = latestKeypoints.left_wrist, rW = latestKeypoints.right_wrist;
                 const headY = (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2;
-                if (lW.y > headY || rW.y > headY) return false; 
+                if (latestKeypoints.left_wrist.y > headY || latestKeypoints.right_wrist.y > headY) return false; 
             }
             if (document.getElementById('modPosture').checked && f('left_shoulder') && f('right_shoulder') && Math.abs(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y) > 22) return false;
             return true;
@@ -111,10 +110,14 @@
                 video.onloadedmetadata = async () => {
                     status.innerText = "Lade stabiles MediaPipe-Modell...";
                     
-                    // Initialisiere den hochpräzisen Google BlazePose Detector
+                    // Lokaler Fix: Wir zwingen MediaPipe, die Assets über das jsDelivr CDN zu laden
                     detector = await poseDetection.createDetector(
                         poseDetection.SupportedModels.BlazePose, 
-                        { runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose' }
+                        { 
+                            runtime: 'mediapipe', 
+                            modelType: 'lite', 
+                            solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404' 
+                        }
                     );
                     
                     status.innerText = "In Position gehen! (5s)"; status.style.color = "#ffaa00"; speak("In Position gehen", true);
@@ -132,9 +135,9 @@
                             }, 1000);
                         }
                     }, 5000);
-                    setInterval(checkRules, 1000); // 1 Scan pro Sekunde reicht völlig aus
+                    setInterval(checkRules, 1000); // Entspannter 1-Sekunden-Takt
                 };
-            } catch(e) { status.innerText = "Fehler beim Start!"; status.style.color = "red"; console.error(e); }
+            } catch(e) { status.innerText = "Fehler beim Laden!"; status.style.color = "red"; console.error(e); }
         }
 
         function initWorkout() {
@@ -172,8 +175,6 @@
 
         async function checkRules() {
             if (!detector || video.readyState < 2) return;
-            
-            // MediaPipe benötigt das Canvas zur Analyse
             const poses = await detector.estimatePoses(canvas);
             
             if (!poses || poses.length === 0) {
@@ -188,7 +189,6 @@
             }
 
             latestKeypoints = {};
-            // MediaPipe benennt die Punkte flach, wir mappen sie direkt in unser Objekt
             poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; });
 
             // UI Indikatoren zeichnen
@@ -203,11 +203,11 @@
 
                 if (f('left_shoulder') && f('right_shoulder')) {
                     const shX = (latestKeypoints.left_shoulder.x + latestKeypoints.right_shoulder.x) / 2, shY = (latestKeypoints.left_shoulder.y + latestKeypoints.right_shoulder.y) / 2;
-                    if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > 12) positionShifted = true;
+                    if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > 13) positionShifted = true;
                 }
                 if (f('left_ear') && f('right_ear') && anchorPose.head) {
                     const hdX = (latestKeypoints.left_ear.x + latestKeypoints.right_ear.x) / 2, hdY = (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2;
-                    if (Math.sqrt(Math.pow(hdX - anchorPose.head.x, 2) + Math.pow(hdY - anchorPose.head.y, 2)) > 12) positionShifted = true;
+                    if (Math.sqrt(Math.pow(hdX - anchorPose.head.x, 2) + Math.pow(hdY - anchorPose.head.y, 2)) > 13) positionShifted = true;
                 }
                 if (f('left_wrist') && anchorPose.lWrist && Math.sqrt(Math.pow(latestKeypoints.left_wrist.x - anchorPose.lWrist.x, 2) + Math.pow(latestKeypoints.left_wrist.y - anchorPose.lWrist.y, 2)) > 16) positionShifted = true;
                 if (f('right_wrist') && anchorPose.rWrist && Math.sqrt(Math.pow(latestKeypoints.right_wrist.x - anchorPose.rWrist.x, 2) + Math.pow(latestKeypoints.right_wrist.y - anchorPose.rWrist.y, 2)) > 16) positionShifted = true;
