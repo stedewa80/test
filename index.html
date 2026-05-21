@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Penalty-Loop Guardian</title>
+    <title>CornerTime - 5-Min Countdown Guardian</title>
     <style>
         body { 
             background-color: #121212; 
@@ -117,8 +117,8 @@
 
         <!-- ACTIVE APP SCREEN -->
         <div id="activeScreen">
-            <!-- Große Stoppuhr -->
-            <div id="timerDisplay" class="timer-display">00:00</div>
+            <!-- Große Stoppuhr (Herunterzählend) -->
+            <div id="timerDisplay" class="timer-display">05:00</div>
             <div id="status" class="status-message">Kamera initialisieren...</div>
             
             <div class="camera-box" id="camContainer">
@@ -158,9 +158,9 @@
         let latestKeypoints = null; 
 
         // --- ZEIT-VARIABLEN ---
-        let totalTrainingSeconds = 0;   // Läuft im grünen Bereich hoch
-        let workoutInterval = null;     // Interval-ID für den Sekundentakt
-        let movementDetectedTime = null;// Zeitstempel des Ausbruchs
+        let timeRemainingSeconds = 300; // Start bei 5 Minuten (300 Sekunden)
+        let workoutInterval = null;     
+        let movementDetectedTime = null;
         let isGracePeriodActive = false;
         let lastSpokenTime = 0;
 
@@ -175,18 +175,25 @@
             window.speechSynthesis.speak(utterance);
         }
 
-        // Formatiert Sekunden in MM:SS
+        // Formatiert verbleibende Sekunden in MM:SS
         function updateTimerUI() {
-            const mins = Math.floor(totalTrainingSeconds / 60).toString().padStart(2, '0');
-            const secs = (totalTrainingSeconds % 60).toString().padStart(2, '0');
+            if (timeRemainingSeconds < 0) timeRemainingSeconds = 0;
+            const mins = Math.floor(timeRemainingSeconds / 60).toString().padStart(2, '0');
+            const secs = (timeRemainingSeconds % 60).toString().padStart(2, '0');
             timerDisplay.innerText = `${mins}:${secs}`;
         }
 
         async function startApp() {
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+            // FIX: Aktiviert Audio-Schnittstelle zwingend im Klick-Event, bevor der Stream startet
+            try {
+                window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+            } catch(audioErr) {
+                console.log("Audio-Init verzögert");
+            }
 
             document.getElementById('setupScreen').style.display = 'none';
             document.getElementById('activeScreen').style.display = 'block';
+            updateTimerUI(); // Initialisiere die 5:00 Anzeige
             
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -206,28 +213,13 @@
                     
                     setTimeout(() => {
                         if (latestKeypoints && latestKeypoints.foundLShoulder && latestKeypoints.foundRShoulder) {
-                            setNewAnchor("Wächter aktiv");
-                            
-                            // Gesamt-Counter starten (tickt jede Sekunde, außer im Korrekturmodus)
-                            workoutInterval = setInterval(() => {
-                                if (isPrepared && !isGracePeriodActive) {
-                                    totalTrainingSeconds++;
-                                    updateTimerUI();
-                                }
-                            }, 1000);
-
+                            initWorkout();
                         } else {
                             status.innerText = "Bitte SICHTBAR vor die Wand stellen...";
                             status.style.color = "#ff3333";
                             let retryAnchor = setInterval(() => {
                                 if (latestKeypoints && latestKeypoints.foundLShoulder && latestKeypoints.foundRShoulder) {
-                                    setNewAnchor("Wächter aktiv");
-                                    workoutInterval = setInterval(() => {
-                                        if (isPrepared && !isGracePeriodActive) {
-                                            totalTrainingSeconds++;
-                                            updateTimerUI();
-                                        }
-                                    }, 1000);
+                                    initWorkout();
                                     clearInterval(retryAnchor);
                                 }
                             }, 1000);
@@ -240,6 +232,29 @@
                 status.innerText = "Kamerafehler! Berechtigungen prüfen.";
                 status.style.color = "red";
             }
+        }
+
+        function initWorkout() {
+            setNewAnchor("Wächter aktiv");
+            
+            // Gesamt-Countdown tickt jede Sekunde herunter (außer im Korrekturmodus)
+            workoutInterval = setInterval(() => {
+                if (isPrepared && !isGracePeriodActive) {
+                    timeRemainingSeconds--;
+                    updateTimerUI();
+
+                    // Erfolg! Zeit ist abgelaufen
+                    if (timeRemainingSeconds <= 0) {
+                        clearInterval(workoutInterval);
+                        isPrepared = false;
+                        status.innerText = "TRAINING BEENDET! Ausgezeichnet! 🎉";
+                        status.style.color = "#00ffcc";
+                        timerDisplay.style.color = "#00ffcc";
+                        container.style.borderColor = "#00ffcc";
+                        speak("Training beendet. Ausgezeichnet.");
+                    }
+                }
+            }, 1000);
         }
 
         function setNewAnchor(audioMessage) {
@@ -324,33 +339,29 @@
 
             if (!isPrepared || !anchorPose) return;
 
-            // --- SCHRITT 1 DER HIERARCHIE: ANWESENHEITS-CHECK (ANTI-CHEAT) ---
+            // --- HIERARCHIE SCHRITT 1: SOFORTIGER ABBRUCH BEI ABWESENHEIT ---
             if (document.getElementById('modPresence').checked && (!foundLShoulder || !foundRShoulder)) {
-                status.innerText = "ANTI-CHEAT: Keine Person erkannt! WORKOUT ABGEBROCHEN! 🔴";
+                status.innerText = "ANTI-CHEAT: Keine Person erkannt! ABGEBROCHEN! 🔴";
                 status.style.color = "#ff3333";
                 container.style.borderColor = "#ff3333";
                 timerDisplay.style.color = "#ff3333";
                 speak("Workout abgebrochen", true);
                 
-                // Beendet das komplette System unwiderruflich
                 clearInterval(workoutInterval);
                 isPrepared = false;
                 return;
             }
 
-            // --- DEINE FUNKTION: PRÜFT DIE SPRECHENDEN GEOMETRIE-BEDINGUNGEN ---
+            // --- BEDINGUNGS-VALIDIERUNG FÜR DEN SCHLUSS-CHECK ---
             function validatePositionConditions() {
-                // Hände über Kopf
                 if (document.getElementById('modHands').checked) {
                     if (!foundLeftEar || !foundRightEar || !foundLWrist || !foundRWrist) return false;
                     const headY = (lE.position.y + rE.position.y) / 2;
                     if (lW.position.y > headY || rW.position.y > headY) return false; 
                 }
-                // Schulter-Geradheit
                 if (document.getElementById('modPosture').checked) {
                     if (Math.abs(lS.position.y - rS.position.y) > 22) return false;
                 }
-                // Stillstands-Check bei der Auswertung
                 if (prevPose) {
                     const curX = (lS.position.x + rS.position.x)/2; const curY = (lS.position.y + rS.position.y)/2;
                     if (Math.abs(curX - prevPose.shoulder.x) > 5 || Math.abs(curY - prevPose.shoulder.y) > 5) return false;
@@ -362,21 +373,17 @@
             if (document.getElementById('modAnchor').checked) {
                 let positionShifted = false;
 
-                // Abweichung Schultern
                 if (foundLShoulder && foundRShoulder) {
                     const shX = (lS.position.x + rS.position.x) / 2; const shY = (lS.position.y + rS.position.y) / 2;
                     if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > 11) positionShifted = true;
                 }
-                // Abweichung Kopf
                 if (foundLeftEar && foundRightEar && anchorPose.head) {
                     const hdX = (lE.position.x + rE.position.x) / 2; const hdY = (lE.position.y + rE.position.y) / 2;
                     if (Math.sqrt(Math.pow(hdX - anchorPose.head.x, 2) + Math.pow(hdY - anchorPose.head.y, 2)) > 11) positionShifted = true;
                 }
-                // Abweichung Hände
                 if (foundLWrist && anchorPose.lWrist && Math.sqrt(Math.pow(lW.position.x - anchorPose.lWrist.x, 2) + Math.pow(lW.position.y - anchorPose.lWrist.y, 2)) > 15) positionShifted = true;
                 if (foundRWrist && anchorPose.rWrist && Math.sqrt(Math.pow(rW.position.x - anchorPose.rWrist.x, 2) + Math.pow(rW.position.y - anchorPose.rWrist.y, 2)) > 15) positionShifted = true;
 
-                // Wenn eine Verschiebung vorliegt ODER das Zeitfenster läuft
                 if (positionShifted || isGracePeriodActive) {
                     const now = Date.now();
                     
@@ -396,18 +403,18 @@
                         container.style.borderColor = "#ffaa00";
                         speak(remainingSeconds.toString());
                     } else {
-                        // --- SCHRITT 2 DER HIERARCHIE: ABRECHNUNG BEI NULL ---
+                        // --- HIERARCHIE SCHRITT 2: ABRECHNUNG BEI NULL ---
                         if (validatePositionConditions()) {
-                            // Erfolg: Neuer Fixpunkt, normaler Counter läuft weiter
                             setNewAnchor("Checkpoint"); 
                         } else {
-                            // Fehler: Akustischer Hinweis + Strafsekunden
-                            totalTrainingSeconds += 10; // 10 Sekunden Strafe addieren!
+                            // NEU: Strafsekunden VERLÄNGERN das Workout (+10 Sekunden addieren)
+                            timeRemainingSeconds += 10; 
                             updateTimerUI();
                             
                             speak("Strafe plus zehn Sekunden", true);
                             
-                            // Timer sofort zurücksetzen: Du bekommst eine neue Chance (neuer Start der 3s)
+                            // Korrektur-Timer sofort zurücksetzen für eine neue 3-Sekunden-Chance
                             movementDetectedTime = Date.now(); 
                             status.innerText = "HALTUNG FALSCH! +10s! Erneuter Versuch... ⏳";
-                            status.
+                            status.style.color = "#ff3333";
+                            timerDisplay.sty
