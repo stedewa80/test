@@ -314,18 +314,32 @@
                 return true;
             }
 
-            // --- DYNAMISCHE POSITIONS-ÜBERWACHUNG ---
+                        // --- DYNAMISCHE POSITIONS-ÜBERWACHUNG ---
             if (document.getElementById('modAnchor').checked) {
                 let positionShifted = false;
 
-                // Teste Abweichung vom aktuellen Checkpoint
+                // 1. Test: Schulter-Abweichung vom aktuellen Checkpoint
                 if (foundLShoulder && foundRShoulder) {
                     const shX = (lS.position.x + rS.position.x) / 2; const shY = (lS.position.y + rS.position.y) / 2;
                     if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > 11) positionShifted = true;
                 }
+
+                // 2. Test: Kopf-Abweichung vom aktuellen Checkpoint
                 if (foundLeftEar && foundRightEar && anchorPose.head) {
                     const hdX = (lE.position.x + rE.position.x) / 2; const hdY = (lE.position.y + rE.position.y) / 2;
                     if (Math.sqrt(Math.pow(hdX - anchorPose.head.x, 2) + Math.pow(hdY - anchorPose.head.y, 2)) > 11) positionShifted = true;
+                }
+
+                // 3. Test (NEU!): Hand-Abweichung links vom aktuellen Checkpoint
+                if (foundLWrist && anchorPose.lWrist) {
+                    const distLWrist = Math.sqrt(Math.pow(lW.position.x - anchorPose.lWrist.x, 2) + Math.pow(lW.position.y - anchorPose.lWrist.y, 2));
+                    if (distLWrist > 15) positionShifted = true; // Fliegt raus bei mehr als ~5,8 cm Bewegung
+                }
+
+                // 4. Test (NEU!): Hand-Abweichung rechts vom aktuellen Checkpoint
+                if (foundRWrist && anchorPose.rWrist) {
+                    const distRWrist = Math.sqrt(Math.pow(rW.position.x - anchorPose.rWrist.x, 2) + Math.pow(rW.position.y - anchorPose.rWrist.y, 2));
+                    if (distRWrist > 15) positionShifted = true;
                 }
 
                 // Unbestechlicher Timer-Schutz: Sobald die Gnadenfrist läuft, MUSS der Countdown bis 0 durchgezogen werden
@@ -355,7 +369,7 @@
                             status.style.color = "#ff3333";
                             container.style.borderColor = "#ff3333";
                             speak("Zeit abgelaufen");
-                            isPrepared = false; // Sperrt die Überwachung bis zum nächsten App-Neustart
+                            isPrepared = false; 
                         }
                     }
                 } else {
