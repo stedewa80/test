@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CornerTime - Profil Diagnose</title>
+    <style>
+        body { background: #121212; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .container { text-align: center; max-width: 500px; width: 100%; padding: 20px; }
+        .video-box { width: 100%; aspect-ratio: 1/1; background: #000; border: 4px solid #333; border-radius: 15px; position: relative; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; object-fit: cover; }
+        .data-box { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-top: 15px; text-align: left; font-family: monospace; font-size: 1.1rem; }
+        .data-row { display: flex; justify-content: space-between; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #333; }
+        .dot { position: absolute; width: 20px; height: 20px; border-radius: 50%; transform: translate(-50%, -50%); display: none; z-index: 10; border: 3px solid white; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+</head>
+<body>
+    <div class="container">
+        <h3>Profil-Diagnose (Seitliche Ansicht)</h3>
+        <div class="video-box" id="box">
+            <video id="webcam" autoplay playsinline muted style="display:none;"></video>
+            <canvas id="canvas"></canvas>
+            <div id="dotS" class="dot" style="background: #ff3333;"></div>
+            <div id="dotH" class="dot" style="background: #33ff33;"></div>
+            <div id="dotK" class="dot" style="background: #3333ff;"></div>
+        </div>
+        <div class="data-box">
+            <div class="data-row" style="color:#ff3333;"><span>Schulter (Rot):</span><span id="valS">Sucht...</span></div>
+            <div class="data-row" style="color:#33ff33;"><span>Hüfte (Grün):</span><span id="valH">Sucht...</span></div>
+            <div class="data-row" style="color:#3333ff;"><span>Knie (Blau):</span><span id="valK">Sucht...</span></div>
+        </div>
+    </div>
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const box = document.getElementById('box');
+        const dS = document.getElementById('dotS'), dH = document.getElementById('dotH'), dK = document.getElementById('dotK');
+        const vS = document.getElementById('valS'), vH = document.getElementById('valH'), vK = document.getElementById('valK');
+        let net = null;
+
+        async function init() {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 } });
+            video.srcObject = stream;
+            video.onloadedmetadata = async () => {
+                net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.50 });
+                loop();
+                setInterval(track, 200);
+            };
+        }
+
+        function loop() {
+            canvas.width = 257; canvas.height = 257;
+            const min = Math.min(video.videoWidth, video.videoHeight);
+            ctx.save(); ctx.translate(257, 0); ctx.scale(-1, 1);
+            ctx.drawImage(video, (video.videoWidth-min)/2, (video.videoHeight-min)/2, min, min, 0, 0, 257, 257);
+            ctx.restore(); requestAnimationFrame(loop);
+        }
+
+        async function track() {
+            if (!net || video.readyState < 2) return;
+            const pose = await net.estimateSinglePose(canvas);
+            
+            // Wir nehmen einfach den Punkt mit dem besseren Score (links oder rechts), da du im Profil stehst
+            const s = pose.keypoints.find(k => k.part === 'leftShoulder').score > pose.keypoints.find(k => k.part === 'rightShoulder').score ? pose.keypoints.find(k => k.part === 'leftShoulder') : pose.keypoints.find(k => k.part === 'rightShoulder');
+            const h = pose.keypoints.find(k => k.part === 'leftHip').score > pose.keypoints.find(k => k.part === 'rightHip').score ? pose.keypoints.find(k => k.part === 'leftHip') : pose.keypoints.find(k => k.part === 'rightHip');
+            const k = pose.keypoints.find(k => k.part === 'leftKnee').score > pose.keypoints.find(k => k.part === 'rightKnee').score ? pose.keypoints.find(k => k.part === 'leftKnee') : pose.keypoints.find(k => k.part === 'rightKnee');
+
+            function update(el, txt, kp) {
+                if (kp && kp.score > 0.3) {
+                    el.style.left = `${(kp.position.x / 257) * box.clientWidth}px`;
+                    el.style.top = `${(kp.position.y / 257) * box.clientHeight}px`;
+                    el.style.display = 'block';
+                    txt.innerText = `X: ${Math.round(kp.position.x)}, Y: ${Math.round(kp.position.y)}`;
+                } else { el.style.display = 'none'; txt.innerText = 'Nicht erkannt'; }
+            }
+            update(dS, vS, s); update(dH, vH, h); update(dK, vK, k);
+        }
+        init();
+    </script>
+</body>
+</html>
