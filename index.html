@@ -126,11 +126,22 @@
                     net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.50 });
                     status.innerText = "In Position gehen! (5s)"; status.style.color = "#ffaa00"; speak("In Position gehen", true);
                     loop();
+                    // Wartet 5 Sekunden, bis du an der Wand stehst
                     setTimeout(() => {
-                        if (latestKeypoints && latestKeypoints.leftShoulder && latestKeypoints.rightShoulder) { initWorkout(); } 
-                        else {
-                            status.innerText = "Bitte SICHTBAR vor die Wand stellen..."; status.style.color = "#ff3333";
-                            let retryAnchor = setInterval(() => { if (latestKeypoints && latestKeypoints.leftShoulder && latestKeypoints.rightShoulder) { initWorkout(); clearInterval(retryAnchor); } }, 1000);
+                        // Prüft, ob du da bist UND ob die Hände bereits oben sind
+                        if (latestKeypoints && latestKeypoints.leftShoulder && latestKeypoints.rightShoulder && validatePositionConditions()) { 
+                            initWorkout(); 
+                        } else {
+                            status.innerText = "Bitte korrekte Haltung einnehmen (Hände hoch!)..."; 
+                            status.style.color = "#ff3333";
+                            
+                            // Warteschleife: Versucht jede Sekunde neu, bis die Haltung stimmt
+                            let retryAnchor = setInterval(() => { 
+                                if (latestKeypoints && latestKeypoints.leftShoulder && latestKeypoints.rightShoulder && validatePositionConditions()) { 
+                                    initWorkout(); 
+                                    clearInterval(retryAnchor); 
+                                } 
+                            }, 1000);
                         }
                     }, 5000);
                     setInterval(checkRules, 350);
@@ -195,19 +206,32 @@
                 clearInterval(workoutInterval); isPrepared = false; return;
             }
 
-            function validatePositionConditions() {
+                        function validatePositionConditions() {
                 if (document.getElementById('modHands').checked && currentProfile.rules.handsOverHead) {
+                    // 1. Sichtbarkeits-Check: Sind überhaupt beide Hände sauber erkannt?
                     if (!f('leftEar') || !f('rightEar') || !f('leftWrist') || !f('rightWrist')) return false;
+                    
+                    const lW = latestKeypoints.leftWrist.position;
+                    const rW = latestKeypoints.rightWrist.position;
+                    
+                    // 2. Klon-Schutz (NEU!): Wenn sich die Punkte überlagern, ist eine Hand verdeckt
+                    const wristDistance = Math.sqrt(Math.pow(lW.x - rW.x, 2) + Math.pow(lW.y - rW.y, 2));
+                    if (wristDistance < 5) return false; // Verhindert das "Doppelgänger"-Schummeln
+
+                    // 3. Höhen-Check: Sind beide Hände über Kopfhöhe?
                     const headY = (latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y) / 2;
-                    if (latestKeypoints.leftWrist.position.y > headY || latestKeypoints.rightWrist.position.y > headY) return false; 
+                    if (lW.y > headY || rW.y > headY) return false; 
                 }
+                
                 if (document.getElementById('modPosture').checked && currentProfile.rules.checkPosture && f('leftShoulder') && f('rightShoulder') && Math.abs(latestKeypoints.leftShoulder.position.y - latestKeypoints.rightShoulder.position.y) > 22) return false;
+                
                 if (prevPose && f('leftShoulder') && f('rightShoulder')) {
                     const curX = (latestKeypoints.leftShoulder.position.x + latestKeypoints.rightShoulder.position.x)/2, curY = (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y)/2;
                     if (Math.abs(curX - prevPose.shoulder.x) > 5 || Math.abs(curY - prevPose.shoulder.y) > 5) return false;
                 }
                 return true;
             }
+
 
             // --- VOLLAUTOMATISCHE LIVE-ÜBERWACHUNG ---
             if (document.getElementById('modAnchor').checked) {
