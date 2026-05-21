@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - 5-Min Countdown Guardian</title>
+    <title>CornerTime - Profile Architecture</title>
     <style>
         body { 
             background-color: #121212; color: #fff; 
@@ -15,6 +15,14 @@
         .setup-screen { background: #1e1e1e; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: left; }
         h2 { text-align: center; margin-top: 0; color: #00ffcc; }
         .option-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 1px solid #333; padding-bottom: 12px; }
+        
+        /* Dropdown Styling */
+        select.profile-select {
+            width: 100%; background: #2a2a2a; color: #fff; border: 2px solid #007aff;
+            padding: 12px; border-radius: 10px; font-size: 1rem; font-weight: bold;
+            margin-bottom: 20px; outline: none; cursor: pointer;
+        }
+        
         .switch { position: relative; display: inline-block; width: 46px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .3s; border-radius: 26px; }
@@ -38,7 +46,15 @@
 <body>
     <div class="app-container">
         <div id="setupScreen" class="setup-screen">
-            <h2>Wächter-Konfig</h2>
+            <h2>Wächter-Profil</h2>
+            
+            <!-- Profil-Auswahl-Menü -->
+            <label for="profileSelect" style="display:block; font-size:0.9rem; color:#aaa; margin-bottom:5px;">Übungs-Position:</label>
+            <select id="profileSelect" class="profile-select">
+                <option value="STEHEND_RECK">Stehend (Hände über Kopf - Rücken)</option>
+                <!-- HIER KÖNNEN WIR SPÄTER EINFACH WEITERE OPTION-ZEILEN ERGÄNZEN -->
+            </select>
+
             <div class="option-row"><span>1. Dynamische Checkpoints</span><label class="switch"><input type="checkbox" id="modAnchor" checked><span class="slider"></span></label></div>
             <div class="option-row"><span>2. Anwesenheit (Anti-Cheat)</span><label class="switch"><input type="checkbox" id="modPresence" checked><span class="slider"></span></label></div>
             <div class="option-row"><span>3. Hände über Kopf (Pflicht)</span><label class="switch"><input type="checkbox" id="modHands" checked><span class="slider"></span></label></div>
@@ -59,8 +75,24 @@
             </div>
         </div>
     </div>
-    <!-- HIER FOLGT JETZT DAS SKRIPT AUS TEIL 2 -->
+    <!-- NÄCHSTE NACHRICHT FOLGT MIT TEIL 2 -->
         <script>
+        // --- DIE NEUE PROFIL-ARCHITEKTUR ---
+        // Hier definieren wir, welche Gelenke für welche Übung überwacht werden
+        const ACTIVE_PROFILES = {
+            "STEHEND_RECK": {
+                // Diese Punkte werden beim Setzen des Fixpunktes eingefroren
+                anchorPoints: ['leftShoulder', 'rightShoulder', 'leftEar', 'rightEar', 'leftWrist', 'rightWrist'],
+                // Toleranzwerte für die Live-Verschiebung im Raum
+                limits: { shoulder: 11, head: 11, wrist: 15 },
+                // Spezifische Zusatzregeln für dieses Profil
+                rules: { handsOverHead: true, checkPosture: true }
+            }
+            // WEITERE PROFILE (Z.B. KNIEND_PROFIL) KÖNNEN HIER EINFACH ERGÄNZT WERDEN
+        };
+
+        let currentProfile = null; // Wird beim Start dynamisch gesetzt
+
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('processingCanvas');
         const ctx = canvas.getContext('2d');
@@ -81,7 +113,7 @@
                 const now = Date.now(); if (!force && (now - lastSpokenTime < 1200)) return; lastSpokenTime = now;
                 const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'de-DE'; utterance.rate = 1.3;
                 window.speechSynthesis.speak(utterance);
-            } catch (e) { console.log("Audiofehler abgefangen:", e); }
+            } catch (e) { console.log("Audiofehler:", e); }
         }
 
         function updateTimerUI() {
@@ -92,6 +124,10 @@
         }
 
         async function startApp() {
+            // Aktives Profil aus dem Dropdown auslesen
+            const selectedKey = document.getElementById('profileSelect').value;
+            currentProfile = ACTIVE_PROFILES[selectedKey];
+
             document.getElementById('setupScreen').style.display = 'none';
             document.getElementById('activeScreen').style.display = 'block';
             updateTimerUI(); 
@@ -132,6 +168,7 @@
         }
 
         function setNewAnchor(audioMessage) {
+            // Der Anker speichert die Rohdaten, berechnet aber nur die Punkte, die das Profil verlangt
             anchorPose = {
                 shoulder: { x: (latestKeypoints.lS.position.x + latestKeypoints.rS.position.x) / 2, y: (latestKeypoints.lS.position.y + latestKeypoints.rS.position.y) / 2 },
                 head: (latestKeypoints.foundLeftEar && latestKeypoints.foundRightEar) ? { x: (latestKeypoints.lE.position.x + latestKeypoints.rE.position.x) / 2, y: (latestKeypoints.lE.position.y + latestKeypoints.rE.position.y) / 2 } : null,
@@ -176,19 +213,21 @@
             let mockHeadPoint = null; if (foundLeftEar && foundRightEar) { mockHeadPoint = { position: { x: (lE.position.x + rE.position.x) / 2, y: (lE.position.y + rE.position.y) / 2 } }; }
             drawIndicator(pts.head, mockHeadPoint, (foundLeftEar && foundRightEar)); drawIndicator(pts.lS, lS, foundLShoulder); drawIndicator(pts.rS, rS, foundRShoulder); drawIndicator(pts.lW, lW, foundLWrist); drawIndicator(pts.rW, rW, foundRWrist);
 
-            if (!isPrepared || !anchorPose) return;
+            if (!isPrepared || !anchorPose || !currentProfile) return;
 
+            // --- SCHRITT 1: ANTI-CHEAT ---
             if (document.getElementById('modPresence').checked && (!foundLShoulder || !foundRShoulder)) {
                 status.innerText = "ANTI-CHEAT: Keine Person erkannt! 🔴"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; speak("Workout abgebrochen", true);
                 clearInterval(workoutInterval); isPrepared = false; return;
             }
 
+            // --- PROFILBASIERTE VALIDIERUNG BEI SCHLUSS-CHECK ---
             function validatePositionConditions() {
-                if (document.getElementById('modHands').checked) {
+                if (document.getElementById('modHands').checked && currentProfile.rules.handsOverHead) {
                     if (!foundLeftEar || !foundRightEar || !foundLWrist || !foundRWrist) return false;
                     const headY = (lE.position.y + rE.position.y) / 2; if (lW.position.y > headY || rW.position.y > headY) return false; 
                 }
-                if (document.getElementById('modPosture').checked && Math.abs(lS.position.y - rS.position.y) > 22) return false;
+                if (document.getElementById('modPosture').checked && currentProfile.rules.checkPosture && Math.abs(lS.position.y - rS.position.y) > 22) return false;
                 if (prevPose) {
                     const curX = (lS.position.x + rS.position.x)/2, curY = (lS.position.y + rS.position.y)/2;
                     if (Math.abs(curX - prevPose.shoulder.x) > 5 || Math.abs(curY - prevPose.shoulder.y) > 5) return false;
@@ -196,15 +235,23 @@
                 return true;
             }
 
+            // --- DYNAMISCHE POSITIONS-ÜBERWACHUNG (PROFILBASIERT) ---
             if (document.getElementById('modAnchor').checked) {
                 let positionShifted = false;
-                if (foundLShoulder && foundRShoulder) {
+
+                // 1. Schulter prüfen (falls im Profil enthalten)
+                if (currentProfile.anchorPoints.includes('leftShoulder') && foundLShoulder && foundRShoulder) {
                     const shX = (lS.position.x + rS.position.x) / 2, shY = (lS.position.y + rS.position.y) / 2;
-                    if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > 11) positionShifted = true;
+                    if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > currentProfile.limits.shoulder) positionShifted = true;
                 }
-                if (foundLeftEar && foundRightEar && anchorPose.head && Math.sqrt(Math.pow(((lE.position.x + rE.position.x)/2) - anchorPose.head.x, 2) + Math.pow(((lE.position.y + rE.position.y)/2) - anchorPose.head.y, 2)) > 11) positionShifted = true;
-                if (foundLWrist && anchorPose.lWrist && Math.sqrt(Math.pow(lW.position.x - anchorPose.lWrist.x, 2) + Math.pow(lW.position.y - anchorPose.lWrist.y, 2)) > 15) positionShifted = true;
-                if (foundRWrist && anchorPose.rWrist && Math.sqrt(Math.pow(rW.position.x - anchorPose.rWrist.x, 2) + Math.pow(rW.position.y - anchorPose.rWrist.y, 2)) > 15) positionShifted = true;
+                // 2. Kopf prüfen (falls im Profil enthalten)
+                if (currentProfile.anchorPoints.includes('leftEar') && foundLeftEar && foundRightEar && anchorPose.head) {
+                    const hdX = (lE.position.x + rE.position.x) / 2, hdY = (lE.position.y + rE.position.y) / 2;
+                    if (Math.sqrt(Math.pow(hdX - anchorPose.head.x, 2) + Math.pow(hdY - anchorPose.head.y, 2)) > currentProfile.limits.head) positionShifted = true;
+                }
+                // 3. Hände prüfen (falls im Profil enthalten)
+                if (currentProfile.anchorPoints.includes('leftWrist') && foundLWrist && anchorPose.lWrist && Math.sqrt(Math.pow(lW.position.x - anchorPose.lWrist.x, 2) + Math.pow(lW.position.y - anchorPose.lWrist.y, 2)) > currentProfile.limits.wrist) positionShifted = true;
+                if (currentProfile.anchorPoints.includes('rightWrist') && foundRWrist && anchorPose.rWrist && Math.sqrt(Math.pow(rW.position.x - anchorPose.rWrist.x, 2) + Math.pow(rW.position.y - anchorPose.rWrist.y, 2)) > currentProfile.limits.wrist) positionShifted = true;
 
                 if (positionShifted || isGracePeriodActive) {
                     const now = Date.now();
