@@ -76,43 +76,32 @@
         </div>
     </div>
     <!-- NÄCHSTE NACHRICHT FOLGT MIT TEIL 2 -->
-        <script>
-        // --- DIE NEUE PROFIL-ARCHITEKTUR ---
-        // Hier definieren wir, welche Gelenke für welche Übung überwacht werden
+            <script>
+        // --- DIE DYNAMISCHE PROFIL-ARCHITEKTUR ---
         const ACTIVE_PROFILES = {
             "STEHEND_RECK": {
-                // Diese Punkte werden beim Setzen des Fixpunktes eingefroren
-                anchorPoints: ['leftShoulder', 'rightShoulder', 'leftEar', 'rightEar', 'leftWrist', 'rightWrist'],
-                // Toleranzwerte für die Live-Verschiebung im Raum
-                limits: { shoulder: 11, head: 11, wrist: 15 },
-                // Spezifische Zusatzregeln für dieses Profil
+                // Du kannst hier JEDEN gültigen PoseNet-Namen eintragen (z.B. leftHip, leftKnee, leftAnkle, leftElbow)
+                joints: ['leftShoulder', 'rightShoulder', 'leftEar', 'rightEar', 'leftWrist', 'rightWrist'],
+                // Die Limits müssen exakt so heißen wie das Gelenk im Array oben!
+                limits: { leftShoulder: 11, rightShoulder: 11, leftEar: 11, rightEar: 11, leftWrist: 15, rightWrist: 15 },
                 rules: { handsOverHead: true, checkPosture: true }
             }
-            // WEITERE PROFILE (Z.B. KNIEND_PROFIL) KÖNNEN HIER EINFACH ERGÄNZT WERDEN
         };
 
-        let currentProfile = null; // Wird beim Start dynamisch gesetzt
+        let currentProfile = null;
+        const video = document.getElementById('webcam'), canvas = document.getElementById('processingCanvas'), ctx = canvas.getContext('2d');
+        const container = document.getElementById('camContainer'), status = document.getElementById('status'), timerDisplay = document.getElementById('timerDisplay');
 
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('processingCanvas');
-        const ctx = canvas.getContext('2d');
-        const container = document.getElementById('camContainer');
-        const status = document.getElementById('status');
-        const timerDisplay = document.getElementById('timerDisplay');
+        // Die visuellen Punkte auf dem Bildschirm
+        const pts = { head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist') };
 
-        const pts = {
-            head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'),
-            rS: document.getElementById('ptRShoulder'), lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist')
-        };
-
-        let net = null, prevPose = null, anchorPose = null, isPrepared = false, latestKeypoints = null; 
+        let net = null, prevPose = null, anchorPose = {}, isPrepared = false, latestKeypoints = null; 
         let timeRemainingSeconds = 300, workoutInterval = null, movementDetectedTime = null, isGracePeriodActive = false, lastSpokenTime = 0;
 
         function speak(text, force = false) {
             try {
                 const now = Date.now(); if (!force && (now - lastSpokenTime < 1200)) return; lastSpokenTime = now;
-                const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'de-DE'; utterance.rate = 1.3;
-                window.speechSynthesis.speak(utterance);
+                const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'de-DE'; utterance.rate = 1.3; window.speechSynthesis.speak(utterance);
             } catch (e) { console.log("Audiofehler:", e); }
         }
 
@@ -124,10 +113,7 @@
         }
 
         async function startApp() {
-            // Aktives Profil aus dem Dropdown auslesen
-            const selectedKey = document.getElementById('profileSelect').value;
-            currentProfile = ACTIVE_PROFILES[selectedKey];
-
+            currentProfile = ACTIVE_PROFILES[document.getElementById('profileSelect').value];
             document.getElementById('setupScreen').style.display = 'none';
             document.getElementById('activeScreen').style.display = 'block';
             updateTimerUI(); 
@@ -141,12 +127,10 @@
                     status.innerText = "In Position gehen! (5s)"; status.style.color = "#ffaa00"; speak("In Position gehen", true);
                     loop();
                     setTimeout(() => {
-                        if (latestKeypoints && latestKeypoints.foundLShoulder && latestKeypoints.foundRShoulder) { initWorkout(); } 
+                        if (latestKeypoints && latestKeypoints.leftShoulder && latestKeypoints.rightShoulder) { initWorkout(); } 
                         else {
                             status.innerText = "Bitte SICHTBAR vor die Wand stellen..."; status.style.color = "#ff3333";
-                            let retryAnchor = setInterval(() => {
-                                if (latestKeypoints && latestKeypoints.foundLShoulder && latestKeypoints.foundRShoulder) { initWorkout(); clearInterval(retryAnchor); }
-                            }, 1000);
+                            let retryAnchor = setInterval(() => { if (latestKeypoints && latestKeypoints.leftShoulder && latestKeypoints.rightShoulder) { initWorkout(); clearInterval(retryAnchor); } }, 1000);
                         }
                     }, 5000);
                     setInterval(checkRules, 350);
@@ -167,14 +151,15 @@
             }, 1000);
         }
 
+        // VOLLAUTOMATISCH: Speichert jeden Punkt, den das Profil verlangt
         function setNewAnchor(audioMessage) {
-            // Der Anker speichert die Rohdaten, berechnet aber nur die Punkte, die das Profil verlangt
-            anchorPose = {
-                shoulder: { x: (latestKeypoints.lS.position.x + latestKeypoints.rS.position.x) / 2, y: (latestKeypoints.lS.position.y + latestKeypoints.rS.position.y) / 2 },
-                head: (latestKeypoints.foundLeftEar && latestKeypoints.foundRightEar) ? { x: (latestKeypoints.lE.position.x + latestKeypoints.rE.position.x) / 2, y: (latestKeypoints.lE.position.y + latestKeypoints.rE.position.y) / 2 } : null,
-                lWrist: latestKeypoints.foundLWrist ? { x: latestKeypoints.lW.position.x, y: latestKeypoints.lW.position.y } : null,
-                rWrist: latestKeypoints.foundRWrist ? { x: latestKeypoints.rW.position.x, y: latestKeypoints.rW.position.y } : null
-            };
+            anchorPose = {}; 
+            currentProfile.joints.forEach(jointName => {
+                const kp = latestKeypoints[jointName];
+                if (kp && kp.score > 0.25) {
+                    anchorPose[jointName] = { x: kp.position.x, y: kp.position.y };
+                }
+            });
             isPrepared = true; isGracePeriodActive = false; movementDetectedTime = null;
             status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333";
             if (audioMessage) speak(audioMessage, true);
@@ -183,75 +168,62 @@
         function loop() {
             canvas.width = 257; canvas.height = 257;
             const minDim = Math.min(video.videoWidth, video.videoHeight);
-            const sx = (video.videoWidth - minDim) / 2, sy = (video.videoHeight - minDim) / 2;
             ctx.save(); ctx.translate(257, 0); ctx.scale(-1, 1);
-            ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, 257, 257); ctx.restore();
+            ctx.drawImage(video, (video.videoWidth - minDim) / 2, (video.videoHeight - minDim) / 2, minDim, minDim, 0, 0, 257, 257); ctx.restore();
             requestAnimationFrame(loop);
         }
 
         async function checkRules() {
             if (!net || video.readyState < 2) return;
             const pose = await net.estimateSinglePose(canvas);
-            const lS = pose.keypoints.find(k => k.part === 'leftShoulder'), rS = pose.keypoints.find(k => k.part === 'rightShoulder');
-            const lW = pose.keypoints.find(k => k.part === 'leftWrist'), rW = pose.keypoints.find(k => k.part === 'rightWrist');
-            const lE = pose.keypoints.find(k => k.part === 'leftEar'), rE = pose.keypoints.find(k => k.part === 'rightEar');
+            
+            // VOLLAUTOMATISCH: Wir mappen alle PoseNet-Keypoints dynamisch in ein Objekt
+            latestKeypoints = {};
+            pose.keypoints.forEach(k => { latestKeypoints[k.part] = k; });
 
-            const foundLShoulder = lS && lS.score > 0.25, foundRShoulder = rS && rS.score > 0.25;
-            const foundLWrist = lW && lW.score > 0.25, foundRWrist = rW && rW.score > 0.25;
-            const foundLeftEar = lE && lE.score > 0.25, foundRightEar = rE && rE.score > 0.25;
-
-            latestKeypoints = { lS, rS, lW, rW, lE, rE, foundLShoulder, foundRShoulder, foundLWrist, foundRWrist, foundLeftEar, foundRightEar };
-
-            function drawIndicator(element, kp, isVisible) {
-                if (isVisible) {
-                    element.style.left = `${(kp.position.x / 257) * container.clientWidth}px`;
-                    element.style.top = `${(kp.position.y / 257) * container.clientHeight}px`;
-                    element.style.display = 'block';
-                } else { element.style.display = 'none'; }
-            }
-
-            let mockHeadPoint = null; if (foundLeftEar && foundRightEar) { mockHeadPoint = { position: { x: (lE.position.x + rE.position.x) / 2, y: (lE.position.y + rE.position.y) / 2 } }; }
-            drawIndicator(pts.head, mockHeadPoint, (foundLeftEar && foundRightEar)); drawIndicator(pts.lS, lS, foundLShoulder); drawIndicator(pts.rS, rS, foundRShoulder); drawIndicator(pts.lW, lW, foundLWrist); drawIndicator(pts.rW, rW, foundRWrist);
+            // Klassische Indikatoren zeichnen (bleibt für die UI visuell unverändert)
+            const f = (part) => latestKeypoints[part] && latestKeypoints[part].score > 0.25;
+            const draw = (el, part) => { if (f(part)) { el.style.left = `${(latestKeypoints[part].position.x / 257) * container.clientWidth}px`; el.style.top = `${(latestKeypoints[part].position.y / 257) * container.clientHeight}px`; el.style.display = 'block'; } else { el.style.display = 'none'; } };
+            draw(pts.lS, 'leftShoulder'); draw(pts.rS, 'rightShoulder'); draw(pts.lW, 'leftWrist'); draw(pts.rW, 'rightWrist');
+            if (f('leftEar') && f('rightEar')) { pts.head.style.left = `${(((latestKeypoints.leftEar.position.x + latestKeypoints.rightEar.position.x)/2) / 257) * container.clientWidth}px`; pts.head.style.top = `${(((latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y)/2) / 257) * container.clientHeight}px`; pts.head.style.display = 'block'; } else { pts.head.style.display = 'none'; }
 
             if (!isPrepared || !anchorPose || !currentProfile) return;
 
-            // --- SCHRITT 1: ANTI-CHEAT ---
-            if (document.getElementById('modPresence').checked && (!foundLShoulder || !foundRShoulder)) {
+            // --- ANTI-CHEAT ---
+            if (document.getElementById('modPresence').checked && (!f('leftShoulder') || !f('rightShoulder'))) {
                 status.innerText = "ANTI-CHEAT: Keine Person erkannt! 🔴"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; speak("Workout abgebrochen", true);
                 clearInterval(workoutInterval); isPrepared = false; return;
             }
 
-            // --- PROFILBASIERTE VALIDIERUNG BEI SCHLUSS-CHECK ---
             function validatePositionConditions() {
                 if (document.getElementById('modHands').checked && currentProfile.rules.handsOverHead) {
-                    if (!foundLeftEar || !foundRightEar || !foundLWrist || !foundRWrist) return false;
-                    const headY = (lE.position.y + rE.position.y) / 2; if (lW.position.y > headY || rW.position.y > headY) return false; 
+                    if (!f('leftEar') || !f('rightEar') || !f('leftWrist') || !f('rightWrist')) return false;
+                    const headY = (latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y) / 2;
+                    if (latestKeypoints.leftWrist.position.y > headY || latestKeypoints.rightWrist.position.y > headY) return false; 
                 }
-                if (document.getElementById('modPosture').checked && currentProfile.rules.checkPosture && Math.abs(lS.position.y - rS.position.y) > 22) return false;
-                if (prevPose) {
-                    const curX = (lS.position.x + rS.position.x)/2, curY = (lS.position.y + rS.position.y)/2;
+                if (document.getElementById('modPosture').checked && currentProfile.rules.checkPosture && f('leftShoulder') && f('rightShoulder') && Math.abs(latestKeypoints.leftShoulder.position.y - latestKeypoints.rightShoulder.position.y) > 22) return false;
+                if (prevPose && f('leftShoulder') && f('rightShoulder')) {
+                    const curX = (latestKeypoints.leftShoulder.position.x + latestKeypoints.rightShoulder.position.x)/2, curY = (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y)/2;
                     if (Math.abs(curX - prevPose.shoulder.x) > 5 || Math.abs(curY - prevPose.shoulder.y) > 5) return false;
                 }
                 return true;
             }
 
-            // --- DYNAMISCHE POSITIONS-ÜBERWACHUNG (PROFILBASIERT) ---
+            // --- VOLLAUTOMATISCHE LIVE-ÜBERWACHUNG ---
             if (document.getElementById('modAnchor').checked) {
                 let positionShifted = false;
 
-                // 1. Schulter prüfen (falls im Profil enthalten)
-                if (currentProfile.anchorPoints.includes('leftShoulder') && foundLShoulder && foundRShoulder) {
-                    const shX = (lS.position.x + rS.position.x) / 2, shY = (lS.position.y + rS.position.y) / 2;
-                    if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > currentProfile.limits.shoulder) positionShifted = true;
-                }
-                // 2. Kopf prüfen (falls im Profil enthalten)
-                if (currentProfile.anchorPoints.includes('leftEar') && foundLeftEar && foundRightEar && anchorPose.head) {
-                    const hdX = (lE.position.x + rE.position.x) / 2, hdY = (lE.position.y + rE.position.y) / 2;
-                    if (Math.sqrt(Math.pow(hdX - anchorPose.head.x, 2) + Math.pow(hdY - anchorPose.head.y, 2)) > currentProfile.limits.head) positionShifted = true;
-                }
-                // 3. Hände prüfen (falls im Profil enthalten)
-                if (currentProfile.anchorPoints.includes('leftWrist') && foundLWrist && anchorPose.lWrist && Math.sqrt(Math.pow(lW.position.x - anchorPose.lWrist.x, 2) + Math.pow(lW.position.y - anchorPose.lWrist.y, 2)) > currentProfile.limits.wrist) positionShifted = true;
-                if (currentProfile.anchorPoints.includes('rightWrist') && foundRWrist && anchorPose.rWrist && Math.sqrt(Math.pow(rW.position.x - anchorPose.rWrist.x, 2) + Math.pow(rW.position.y - anchorPose.rWrist.y, 2)) > currentProfile.limits.wrist) positionShifted = true;
+                // Gehe jeden im Profil hinterlegten Punkt durch und vergleiche ihn mit seinem Anker
+                currentProfile.joints.forEach(jointName => {
+                    if (f(jointName) && anchorPose[jointName]) {
+                        const cur = latestKeypoints[jointName].position;
+                        const anc = anchorPose[jointName];
+                        const dist = Math.sqrt(Math.pow(cur.x - anc.x, 2) + Math.pow(cur.y - anc.y, 2));
+                        
+                        // Wenn der erlaubte Grenzwert für dieses spezifische Gelenk überschritten wird
+                        if (dist > currentProfile.limits[jointName]) { positionShifted = true; }
+                    }
+                });
 
                 if (positionShifted || isGracePeriodActive) {
                     const now = Date.now();
@@ -269,7 +241,7 @@
                     }
                 } else { status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333"; }
             }
-            prevPose = { shoulder: (foundLShoulder && foundRShoulder) ? { x: (lS.position.x + rS.position.x)/2, y: (lS.position.y + rS.position.y)/2 } : null };
+            prevPose = { shoulder: (f('leftShoulder') && f('rightShoulder')) ? { x: (latestKeypoints.leftShoulder.position.x + latestKeypoints.rightShoulder.position.x)/2, y: (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y)/2 } : null };
         }
     </script>
 </body>
