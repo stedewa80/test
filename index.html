@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Absolute Anchor Guardian</title>
+    <title>CornerTime - Professional Dual-Motion Guardian</title>
     <style>
         body { 
             background-color: #121212; 
@@ -98,10 +98,11 @@
         <!-- SETUP SCREEN -->
         <div id="setupScreen" class="setup-screen">
             <h2>Wächter-Konfig</h2>
-            <div class="option-row"><span>1. Anti-Schleich-Bewegung</span><label class="switch"><input type="checkbox" id="modMotion" checked><span class="slider"></span></label></div>
-            <div class="option-row"><span>2. Anwesenheit (Anti-Cheat)</span><label class="switch"><input type="checkbox" id="modPresence" checked><span class="slider"></span></label></div>
-            <div class="option-row"><span>3. Hände-Kontrolle (Höhe)</span><label class="switch"><input type="checkbox" id="modHands" checked><span class="slider"></span></label></div>
-            <div class="option-row"><span>4. Haltung (Schulter-Neigung)</span><label class="switch"><input type="checkbox" id="modPosture"><span class="slider"></span></label></div>
+            <div class="option-row"><span>1. Bewegung (Zucken/Zappeln)</span><label class="switch"><input type="checkbox" id="modMotion" checked><span class="slider"></span></label></div>
+            <div class="option-row"><span>2. Positions-Anker (Anti-Schleich)</span><label class="switch"><input type="checkbox" id="modAnchor"><span class="slider"></span></label></div>
+            <div class="option-row"><span>3. Anwesenheit (Anti-Cheat)</span><label class="switch"><input type="checkbox" id="modPresence" checked><span class="slider"></span></label></div>
+            <div class="option-row"><span>4. Hände-Kontrolle (Höhe)</span><label class="switch"><input type="checkbox" id="modHands" checked><span class="slider"></span></label></div>
+            <div class="option-row"><span>5. Haltung (Schulter-Neigung)</span><label class="switch"><input type="checkbox" id="modPosture"><span class="slider"></span></label></div>
             <button class="start-btn" onclick="startApp()">ÜBERWACHUNG STARTEN</button>
         </div>
 
@@ -139,10 +140,9 @@
         };
 
         let net = null;
-        let anchorPose = null; // Das unbestechliche Gedächtnis
+        let prevPose = null;   // Für Wächter 1 (Kurzzeit-Vergleich 350ms)
+        let anchorPose = null; // Für Wächter 2 (Langzeit-Urstartpunkt)
         let isPrepared = false;
-
-        // Hilfsvariablen, um den Anker im richtigen Moment zu greifen
         let latestKeypoints = null; 
 
         async function startApp() {
@@ -164,40 +164,16 @@
                     
                     loop();
                     
-                    // Nach 5 Sekunden wird die exakte IST-Position als Anker eingefroren
+                    // Nach 5 Sekunden wird die exakte IST-Position als unbestechlicher Ur-Anker eingefroren
                     setTimeout(() => {
                         if (latestKeypoints && latestKeypoints.foundLShoulder && latestKeypoints.foundRShoulder) {
-                            anchorPose = {
-                                shoulder: {
-                                    x: (latestKeypoints.lS.position.x + latestKeypoints.rS.position.x) / 2,
-                                    y: (latestKeypoints.lS.position.y + latestKeypoints.rS.position.y) / 2
-                                },
-                                head: (latestKeypoints.foundLeftEar && latestKeypoints.foundRightEar) ? {
-                                    x: (latestKeypoints.lE.position.x + latestKeypoints.rE.position.x) / 2,
-                                    y: (latestKeypoints.lE.position.y + latestKeypoints.rE.position.y) / 2
-                                } : null,
-                                lWrist: latestKeypoints.foundLWrist ? { x: latestKeypoints.lW.position.x, y: latestKeypoints.lW.position.y } : null,
-                                rWrist: latestKeypoints.foundRWrist ? { x: latestKeypoints.rW.position.x, y: latestKeypoints.rW.position.y } : null
-                            };
-                            isPrepared = true;
-                            status.innerText = "Überwachung aktiv! 🟢";
-                            status.style.color = "#00ffcc";
+                            freezeAnchor();
                         } else {
-                            // Fail-Safe: Falls der User noch nicht im Bild stand, versuchen wir es jede Sekunde erneut, bis der Anker sitzt
                             status.innerText = "Bitte SICHTBAR vor die Wand stellen...";
                             status.style.color = "#ff3333";
                             let retryAnchor = setInterval(() => {
                                 if (latestKeypoints && latestKeypoints.foundLShoulder && latestKeypoints.foundRShoulder) {
-                                    // Gleiche Logik wie oben
-                                    anchorPose = {
-                                        shoulder: { x: (latestKeypoints.lS.position.x + latestKeypoints.rS.position.x) / 2, y: (latestKeypoints.lS.position.y + latestKeypoints.rS.position.y) / 2 },
-                                        head: (latestKeypoints.foundLeftEar && latestKeypoints.foundRightEar) ? { x: (latestKeypoints.lE.position.x + latestKeypoints.rE.position.x) / 2, y: (latestKeypoints.lE.position.y + latestKeypoints.rE.position.y) / 2 } : null,
-                                        lWrist: latestKeypoints.foundLWrist ? { x: latestKeypoints.lW.position.x, y: latestKeypoints.lW.position.y } : null,
-                                        rWrist: latestKeypoints.foundRWrist ? { x: latestKeypoints.rW.position.x, y: latestKeypoints.rW.position.y } : null
-                                    };
-                                    isPrepared = true;
-                                    status.innerText = "Überwachung aktiv! 🟢";
-                                    status.style.color = "#00ffcc";
+                                    freezeAnchor();
                                     clearInterval(retryAnchor);
                                 }
                             }, 1000);
@@ -210,6 +186,24 @@
                 status.innerText = "Kamerafehler! Berechtigungen prüfen.";
                 status.style.color = "red";
             }
+        }
+
+        function freezeAnchor() {
+            anchorPose = {
+                shoulder: {
+                    x: (latestKeypoints.lS.position.x + latestKeypoints.rS.position.x) / 2,
+                    y: (latestKeypoints.lS.position.y + latestKeypoints.rS.position.y) / 2
+                },
+                head: (latestKeypoints.foundLeftEar && latestKeypoints.foundRightEar) ? {
+                    x: (latestKeypoints.lE.position.x + latestKeypoints.rE.position.x) / 2,
+                    y: (latestKeypoints.lE.position.y + latestKeypoints.rE.position.y) / 2
+                } : null,
+                lWrist: latestKeypoints.foundLWrist ? { x: latestKeypoints.lW.position.x, y: latestKeypoints.lW.position.y } : null,
+                rWrist: latestKeypoints.foundRWrist ? { x: latestKeypoints.rW.position.x, y: latestKeypoints.rW.position.y } : null
+            };
+            isPrepared = true;
+            status.innerText = "Überwachung aktiv! 🟢";
+            status.style.color = "#00ffcc";
         }
 
         function loop() {
@@ -244,7 +238,6 @@
             const foundLeftEar = lE && lE.score > 0.25;
             const foundRightEar = rE && rE.score > 0.25;
 
-            // Global zwischenspeichern, damit die startApp-Schleife den Anker auslesen kann
             latestKeypoints = { lS, rS, lW, rW, lE, rE, foundLShoulder, foundRShoulder, foundLWrist, foundRWrist, foundLeftEar, foundRightEar };
 
             // --- VISUELLE PUNKTE PLATZIEREN ---
@@ -269,63 +262,69 @@
             drawIndicator(pts.lW, lW, foundLWrist);
             drawIndicator(pts.rW, rW, foundRWrist);
 
-            if (!isPrepared || !anchorPose) return;
+            if (!isPrepared) return;
 
             let currentAlert = "Überwachung aktiv! 🟢";
             let currentColor = "#00ffcc";
             let borderColor = "#333333";
 
-            // --- WÄCHTER 1: ABSOLUTE ANKER-BEWEGUNG (ANTI-SCHLEICH) ---
-            if (document.getElementById('modMotion').checked) {
-                let movementTriggered = false;
+            // --- WÄCHTER 1: KLASSISCHE BEWEGUNG (ZUCKEN / SCHNELLE BEWEGUNG) ---
+            if (document.getElementById('modMotion').checked && prevPose) {
+                let rapidMovement = false;
 
-                // 1. Check: Schultermitten-Abweichung vom Startpunkt
+                if (foundLeftEar && foundRightEar && prevPose.head) {
+                    const headX = (lE.position.x + rE.position.x) / 2; const headY = (lE.position.y + rE.position.y) / 2;
+                    if (Math.abs(headX - prevPose.head.x) > 8 || Math.abs(headY - prevPose.head.y) > 8) rapidMovement = true;
+                }
+                if (foundLShoulder && foundRShoulder && prevPose.shoulder) {
+                    const shX = (lS.position.x + rS.position.x) / 2; const shY = (lS.position.y + rS.position.y) / 2;
+                    if (Math.abs(shX - prevPose.shoulder.x) > 8 || Math.abs(shY - prevPose.shoulder.y) > 8) rapidMovement = true;
+                }
+                if (foundLWrist && prevPose.lWrist && (Math.abs(lW.position.x - prevPose.lWrist.x) > 12 || Math.abs(lW.position.y - prevPose.lWrist.y) > 12)) rapidMovement = true;
+                if (foundRWrist && prevPose.rWrist && (Math.abs(rW.position.x - prevPose.rWrist.x) > 12 || Math.abs(rW.position.y - prevPose.rWrist.y) > 12)) rapidMovement = true;
+
+                if (rapidMovement) {
+                    currentAlert = "BEWEGUNG DETEKTIERT! Stillstehen! 🔴";
+                    currentColor = "#ff3333"; borderColor = "#ff3333";
+                }
+            }
+            
+            // Kurzzeit-Gedächtnis für Wächter 1 überschreiben
+            prevPose = {
+                head: (foundLeftEar && foundRightEar) ? { x: (lE.position.x + rE.position.x)/2, y: (lE.position.y + rE.position.y)/2 } : null,
+                shoulder: (foundLShoulder && foundRShoulder) ? { x: (lS.position.x + rS.position.x)/2, y: (lS.position.y + rS.position.y)/2 } : null,
+                lWrist: foundLWrist ? { x: lW.position.x, y: lW.position.y } : null,
+                rWrist: foundRWrist ? { x: rW.position.x, y: rW.position.y } : null
+            };
+
+            // --- WÄCHTER 2: POSITIONS-ANKER (ANTI-SCHLEICH / LANGZEIT) ---
+            if (document.getElementById('modAnchor').checked && anchorPose) {
+                let anchorViolated = false;
+
                 if (foundLShoulder && foundRShoulder) {
-                    const currentShoulderX = (lS.position.x + rS.position.x) / 2;
-                    const currentShoulderY = (lS.position.y + rS.position.y) / 2;
-                    
-                    const distShoulder = Math.sqrt(
-                        Math.pow(currentShoulderX - anchorPose.shoulder.x, 2) + 
-                        Math.pow(currentShoulderY - anchorPose.shoulder.y, 2)
-                    );
-                    // Wenn du dich mehr als ca. 4 cm vom Ur-Startpunkt wegbewegst
-                    if (distShoulder > 11) movementTriggered = true;
+                    const shX = (lS.position.x + rS.position.x) / 2; const shY = (lS.position.y + rS.position.y) / 2;
+                    if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > 11) anchorViolated = true;
                 }
-
-                // 2. Check: Kopf-Abweichung vom Startpunkt
                 if (foundLeftEar && foundRightEar && anchorPose.head) {
-                    const currentHeadX = (lE.position.x + rE.position.x) / 2;
-                    const currentHeadY = (lE.position.y + rE.position.y) / 2;
-                    
-                    const distHead = Math.sqrt(Math.pow(currentHeadX - anchorPose.head.x, 2) + Math.pow(currentHeadY - anchorPose.head.y, 2));
-                    if (distHead > 11) movementTriggered = true;
+                    const hdX = (lE.position.x + rE.position.x) / 2; const hdY = (lE.position.y + rE.position.y) / 2;
+                    if (Math.sqrt(Math.pow(hdX - anchorPose.head.x, 2) + Math.pow(hdY - anchorPose.head.y, 2)) > 11) anchorViolated = true;
                 }
+                if (foundLWrist && anchorPose.lWrist && Math.sqrt(Math.pow(lW.position.x - anchorPose.lWrist.x, 2) + Math.pow(lW.position.y - anchorPose.lWrist.y, 2)) > 15) anchorViolated = true;
+                if (foundRWrist && anchorPose.rWrist && Math.sqrt(Math.pow(rW.position.x - anchorPose.rWrist.x, 2) + Math.pow(rW.position.y - anchorPose.rWrist.y, 2)) > 15) anchorViolated = true;
 
-                // 3. Check: Schleichendes Absinken der Hände vom Startpunkt
-                if (foundLWrist && anchorPose.lWrist) {
-                    const distLWrist = Math.sqrt(Math.pow(lW.position.x - anchorPose.lWrist.x, 2) + Math.pow(lW.position.y - anchorPose.lWrist.y, 2));
-                    if (distLWrist > 15) movementTriggered = true;
-                }
-                if (foundRWrist && anchorPose.rWrist) {
-                    const distRWrist = Math.sqrt(Math.pow(rW.position.x - anchorPose.rWrist.x, 2) + Math.pow(rW.position.y - anchorPose.rWrist.y, 2));
-                    if (distRWrist > 15) movementTriggered = true;
-                }
-
-                if (movementTriggered) {
+                if (anchorViolated) {
                     currentAlert = "POSITIONSVERLUST! Zurück zum Startpunkt! 🔴";
                     currentColor = "#ff3333"; borderColor = "#ff3333";
                 }
             }
 
-            // --- WÄCHTER 2: ANWESENHEIT ---
-            if (document.getElementById('modPresence').checked) {
-                if (!foundLShoulder && !foundRShoulder) {
-                    currentAlert = "ANTI-CHEAT: Keine Person erkannt! 🔴";
-                    currentColor = "#ff3333"; borderColor = "#ff3333";
-                }
+            // --- WÄCHTER 3: ANWESENHEIT ---
+            if (document.getElementById('modPresence').checked && !foundLShoulder && !foundRShoulder) {
+                currentAlert = "ANTI-CHEAT: Keine Person erkannt! 🔴";
+                currentColor = "#ff3333"; borderColor = "#ff3333";
             }
 
-            // --- WÄCHTER 3: HÄNDE UNTER KOPFHÖHE ---
+            // --- WÄCHTER 4: HÄNDE UNTER KOPFHÖHE ---
             if (document.getElementById('modHands').checked && foundLeftEar && foundRightEar) {
                 const headY = (lE.position.y + rE.position.y) / 2;
                 if ((foundLWrist && lW.position.y > headY) || (foundRWrist && rW.position.y > headY)) {
@@ -334,7 +333,7 @@
                 }
             }
 
-            // --- WÄCHTER 4: HALTUNG (SCHULTER-NEIGUNG) ---
+            // --- WÄCHTER 5: HALTUNG (SCHULTER-NEIGUNG) ---
             if (document.getElementById('modPosture').checked && foundLShoulder && foundRShoulder) {
                 const shoulderTilt = Math.abs(lS.position.y - rS.position.y);
                 if (shoulderTilt > 22) {
