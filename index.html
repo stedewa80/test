@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Classic Wächter</title>
+    <title>CornerTime - MediaPipe Wächter</title>
     <style>
         body { 
             background-color: #121212; color: #fff; 
@@ -27,19 +27,23 @@
         .status-message { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; min-height: 2rem; color: #00ffcc; text-align: center; }
         .camera-box { width: 100%; border-radius: 20px; border: 8px solid #333333; overflow: hidden; background: #000000; position: relative; aspect-ratio: 1 / 1; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: border-color 0.2s, box-shadow 0.2s; }
         canvas#processingCanvas { display: block; width: 100%; height: 100%; object-fit: cover; }
-        .joint-indicator { position: absolute; width: 25px; height: 25px; border-radius: 50%; pointer-events: none; display: none; z-index: 9999; transform: translate(-50%, -50%); transition: left 0.05s linear, top 0.05s linear; }
+        .joint-indicator { position: absolute; width: 25px; height: 25px; border-radius: 50%; pointer-events: none; display: none; z-index: 9999; transform: translate(-50%, -50%); }
         #ptHead { border: 4px solid #00ffcc; background: rgba(0,255,204,0.2); }
         #ptLShoulder, #ptRShoulder { border: 4px solid #28a745; background: rgba(40,167,69,0.2); }
         #ptLWrist, #ptRWrist { border: 4px solid #3399ff; background: rgba(51,153,255,0.2); }
         button.start-btn { background: #007aff; color: white; border: none; padding: 16px; font-size: 1.2rem; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 10px; width: 100%; box-shadow: 0 4px 10px rgba(0,122,255,0.3); }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+    
+    <!-- Die neuen, modernen MediaPipe & TensorFlow Bibliotheken -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
 </head>
 <body>
     <div class="app-container">
         <div id="setupScreen" class="setup-screen">
-            <h2>Wächter Setup</h2>
+            <h2>Wächter Setup (MediaPipe)</h2>
             <div class="option-row"><span>1. Dynamische Checkpoints</span><label class="switch"><input type="checkbox" id="modAnchor" checked><span class="slider"></span></label></div>
             <div class="option-row"><span>2. Anwesenheit (Anti-Cheat)</span><label class="switch"><input type="checkbox" id="modPresence" checked><span class="slider"></span></label></div>
             <div class="option-row"><span>3. Hände über Kopf (Pflicht)</span><label class="switch"><input type="checkbox" id="modHands" checked><span class="slider"></span></label></div>
@@ -66,7 +70,7 @@
         const container = document.getElementById('camContainer'), status = document.getElementById('status'), timerDisplay = document.getElementById('timerDisplay');
         const pts = { head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist') };
 
-        let net = null, prevPose = null, anchorPose = null, isPrepared = false, latestKeypoints = null; 
+        let detector = null, anchorPose = null, isPrepared = false, latestKeypoints = {}; 
         let timeRemainingSeconds = 300, workoutInterval = null, movementDetectedTime = null, isGracePeriodActive = false, lastSpokenTime = 0, errorCounter = 0;
 
         function speak(text, force = false) {
@@ -83,21 +87,16 @@
             timerDisplay.innerText = `${mins}:${secs}`;
         }
 
-        function f(part) { return latestKeypoints && latestKeypoints[part] && latestKeypoints[part].score > 0.25; }
+        function f(part) { return latestKeypoints && latestKeypoints[part] && latestKeypoints[part].score > 0.4; }
 
         function validatePositionConditions() {
             if (document.getElementById('modHands').checked) {
-                if (!f('leftEar') || !f('rightEar') || !f('leftWrist') || !f('rightWrist')) return false;
-                const lW = latestKeypoints.leftWrist.position, rW = latestKeypoints.rightWrist.position;
-                if (Math.sqrt(Math.pow(lW.x - rW.x, 2) + Math.pow(lW.y - rW.y, 2)) < 5) return false; 
-                const headY = (latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y) / 2;
+                if (!f('left_ear') || !f('right_ear') || !f('left_wrist') || !f('right_wrist')) return false;
+                const lW = latestKeypoints.left_wrist, rW = latestKeypoints.right_wrist;
+                const headY = (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2;
                 if (lW.y > headY || rW.y > headY) return false; 
             }
-            if (document.getElementById('modPosture').checked && f('leftShoulder') && f('rightShoulder') && Math.abs(latestKeypoints.leftShoulder.position.y - latestKeypoints.rightShoulder.position.y) > 22) return false;
-            if (prevPose && f('leftShoulder') && f('rightShoulder')) {
-                const curX = (latestKeypoints.leftShoulder.position.x + latestKeypoints.rightShoulder.position.x)/2, curY = (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y)/2;
-                if (Math.abs(curX - prevPose.shoulder.x) > 5 || Math.abs(curY - prevPose.shoulder.y) > 5) return false;
-            }
+            if (document.getElementById('modPosture').checked && f('left_shoulder') && f('right_shoulder') && Math.abs(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y) > 22) return false;
             return true;
         }
 
@@ -110,27 +109,32 @@
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
                 video.srcObject = stream;
                 video.onloadedmetadata = async () => {
-                    status.innerText = "Lade schnelles KI-Modell...";
-                    net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.50 });
+                    status.innerText = "Lade stabiles MediaPipe-Modell...";
+                    
+                    // Initialisiere den hochpräzisen Google BlazePose Detector
+                    detector = await poseDetection.createDetector(
+                        poseDetection.SupportedModels.BlazePose, 
+                        { runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose' }
+                    );
+                    
                     status.innerText = "In Position gehen! (5s)"; status.style.color = "#ffaa00"; speak("In Position gehen", true);
                     loop();
                     
                     setTimeout(() => {
-                        if (f('leftShoulder') && f('rightShoulder') && validatePositionConditions()) { 
+                        if (f('left_shoulder') && f('right_shoulder') && validatePositionConditions()) { 
                             initWorkout(); 
                         } else {
                             status.innerText = "Bitte korrekte Haltung einnehmen (Hände hoch!)..."; status.style.color = "#ff3333";
                             let retryAnchor = setInterval(() => { 
-                                if (f('leftShoulder') && f('rightShoulder') && validatePositionConditions()) { 
+                                if (f('left_shoulder') && f('right_shoulder') && validatePositionConditions()) { 
                                     initWorkout(); clearInterval(retryAnchor); 
                                 } 
                             }, 1000);
                         }
                     }, 5000);
-                    // --- NETZSCHONER: Scannt nur noch 1x pro Sekunde ---
-                    setInterval(checkRules, 1000);
+                    setInterval(checkRules, 1000); // 1 Scan pro Sekunde reicht völlig aus
                 };
-            } catch(e) { status.innerText = "Kamerafehler! Berechtigungen prüfen."; status.style.color = "red"; }
+            } catch(e) { status.innerText = "Fehler beim Start!"; status.style.color = "red"; console.error(e); }
         }
 
         function initWorkout() {
@@ -148,10 +152,10 @@
 
         function setNewAnchor(audioMessage) {
             anchorPose = {
-                shoulder: { x: (latestKeypoints.leftShoulder.position.x + latestKeypoints.rightShoulder.position.x) / 2, y: (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y) / 2 },
-                head: (f('leftEar') && f('rightEar')) ? { x: (latestKeypoints.leftEar.position.x + latestKeypoints.rightEar.position.x) / 2, y: (latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y) / 2 } : null,
-                lWrist: f('leftWrist') ? { x: latestKeypoints.leftWrist.position.x, y: latestKeypoints.leftWrist.position.y } : null,
-                rWrist: f('rightWrist') ? { x: latestKeypoints.rightWrist.position.x, y: latestKeypoints.rightWrist.position.y } : null
+                shoulder: { x: (latestKeypoints.left_shoulder.x + latestKeypoints.right_shoulder.x) / 2, y: (latestKeypoints.left_shoulder.y + latestKeypoints.right_shoulder.y) / 2 },
+                head: (f('left_ear') && f('right_ear')) ? { x: (latestKeypoints.left_ear.x + latestKeypoints.right_ear.x) / 2, y: (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2 } : null,
+                lWrist: f('left_wrist') ? { x: latestKeypoints.left_wrist.x, y: latestKeypoints.left_wrist.y } : null,
+                rWrist: f('right_wrist') ? { x: latestKeypoints.right_wrist.x, y: latestKeypoints.right_wrist.y } : null
             };
             isPrepared = true; isGracePeriodActive = false; movementDetectedTime = null; errorCounter = 0;
             status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333";
@@ -167,45 +171,49 @@
         }
 
         async function checkRules() {
-            if (!net || video.readyState < 2) return;
-            const pose = await net.estimateSinglePose(canvas);
+            if (!detector || video.readyState < 2) return;
             
-            latestKeypoints = {};
-            pose.keypoints.forEach(k => { latestKeypoints[k.part] = k; });
-
-            const draw = (el, part) => { if (f(part)) { el.style.left = `${(latestKeypoints[part].position.x / 257) * container.clientWidth}px`; el.style.top = `${(latestKeypoints[part].position.y / 257) * container.clientHeight}px`; el.style.display = 'block'; } else { el.style.display = 'none'; } };
-            draw(pts.lS, 'leftShoulder'); draw(pts.rS, 'rightShoulder'); draw(pts.lW, 'leftWrist'); draw(pts.rW, 'rightWrist');
-            if (f('leftEar') && f('rightEar')) { pts.head.style.left = `${(((latestKeypoints.leftEar.position.x + latestKeypoints.rightEar.position.x)/2) / 257) * container.clientWidth}px`; pts.head.style.top = `${(((latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y)/2) / 257) * container.clientHeight}px`; pts.head.style.display = 'block'; } else { pts.head.style.display = 'none'; }
-
-            if (!isPrepared || !anchorPose) return;
-
-            // --- ANTI-CHEAT MIT PUFFER ---
-            if (document.getElementById('modPresence').checked && (!f('leftShoulder') || !f('rightShoulder'))) {
-                errorCounter++;
-                if (errorCounter >= 2) {
-                    status.innerText = "ANTI-CHEAT: Keine Person erkannt! 🔴"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; speak("Workout abgebrochen", true);
-                    clearInterval(workoutInterval); isPrepared = false;
+            // MediaPipe benötigt das Canvas zur Analyse
+            const poses = await detector.estimatePoses(canvas);
+            
+            if (!poses || poses.length === 0) {
+                if (isPrepared && document.getElementById('modPresence').checked) {
+                    errorCounter++;
+                    if (errorCounter >= 2) {
+                        status.innerText = "ANTI-CHEAT: Keine Person erkannt! 🔴"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; speak("Workout abgebrochen", true);
+                        clearInterval(workoutInterval); isPrepared = false;
+                    }
                 }
                 return;
             }
 
+            latestKeypoints = {};
+            // MediaPipe benennt die Punkte flach, wir mappen sie direkt in unser Objekt
+            poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; });
+
+            // UI Indikatoren zeichnen
+            const draw = (el, part) => { if (f(part)) { el.style.left = `${(latestKeypoints[part].x / 257) * container.clientWidth}px`; el.style.top = `${(latestKeypoints[part].y / 257) * container.clientHeight}px`; el.style.display = 'block'; } else { el.style.display = 'none'; } };
+            draw(pts.lS, 'left_shoulder'); draw(pts.rS, 'right_shoulder'); draw(pts.lW, 'left_wrist'); draw(pts.rW, 'right_wrist');
+            if (f('left_ear') && f('right_ear')) { pts.head.style.left = `${(((latestKeypoints.left_ear.x + latestKeypoints.right_ear.x)/2) / 257) * container.clientWidth}px`; pts.head.style.top = `${(((latestKeypoints.left_ear.y + latestKeypoints.right_ear.y)/2) / 257) * container.clientHeight}px`; pts.head.style.display = 'block'; } else { pts.head.style.display = 'none'; }
+
+            if (!isPrepared || !anchorPose) return;
+
             if (document.getElementById('modAnchor').checked) {
                 let positionShifted = false;
 
-                if (f('leftShoulder') && f('rightShoulder')) {
-                    const shX = (latestKeypoints.leftShoulder.position.x + latestKeypoints.rightShoulder.position.x) / 2, shY = (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y) / 2;
-                    if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > 11) positionShifted = true;
+                if (f('left_shoulder') && f('right_shoulder')) {
+                    const shX = (latestKeypoints.left_shoulder.x + latestKeypoints.right_shoulder.x) / 2, shY = (latestKeypoints.left_shoulder.y + latestKeypoints.right_shoulder.y) / 2;
+                    if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > 12) positionShifted = true;
                 }
-                if (f('leftEar') && f('rightEar') && anchorPose.head) {
-                    const hdX = (latestKeypoints.leftEar.position.x + latestKeypoints.rightEar.position.x) / 2, hdY = (latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y) / 2;
-                    if (Math.sqrt(Math.pow(hdX - anchorPose.head.x, 2) + Math.pow(hdY - anchorPose.head.y, 2)) > 11) positionShifted = true;
+                if (f('left_ear') && f('right_ear') && anchorPose.head) {
+                    const hdX = (latestKeypoints.left_ear.x + latestKeypoints.right_ear.x) / 2, hdY = (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2;
+                    if (Math.sqrt(Math.pow(hdX - anchorPose.head.x, 2) + Math.pow(hdY - anchorPose.head.y, 2)) > 12) positionShifted = true;
                 }
-                if (f('leftWrist') && anchorPose.lWrist && Math.sqrt(Math.pow(latestKeypoints.leftWrist.position.x - anchorPose.lWrist.x, 2) + Math.pow(latestKeypoints.leftWrist.position.y - anchorPose.lWrist.y, 2)) > 15) positionShifted = true;
-                if (f('rightWrist') && anchorPose.rWrist && Math.sqrt(Math.pow(latestKeypoints.rightWrist.position.x - anchorPose.rWrist.x, 2) + Math.pow(latestKeypoints.rightWrist.position.y - anchorPose.rWrist.y, 2)) > 15) positionShifted = true;
+                if (f('left_wrist') && anchorPose.lWrist && Math.sqrt(Math.pow(latestKeypoints.left_wrist.x - anchorPose.lWrist.x, 2) + Math.pow(latestKeypoints.left_wrist.y - anchorPose.lWrist.y, 2)) > 16) positionShifted = true;
+                if (f('right_wrist') && anchorPose.rWrist && Math.sqrt(Math.pow(latestKeypoints.right_wrist.x - anchorPose.rWrist.x, 2) + Math.pow(latestKeypoints.right_wrist.y - anchorPose.rWrist.y, 2)) > 16) positionShifted = true;
 
                 if (positionShifted || !validatePositionConditions()) {
                     errorCounter++;
-                    
                     if (errorCounter >= 2 || isGracePeriodActive) {
                         const now = Date.now();
                         if (!isGracePeriodActive) { isGracePeriodActive = true; movementDetectedTime = now; speak("Korrigiere", true); }
@@ -226,7 +234,6 @@
                     status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333"; 
                 }
             }
-            prevPose = { shoulder: (f('leftShoulder') && f('rightShoulder')) ? { x: (latestKeypoints.leftShoulder.position.x + latestKeypoints.rightShoulder.position.x)/2, y: (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y)/2 } : null };
         }
     </script>
 </body>
