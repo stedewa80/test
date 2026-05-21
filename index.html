@@ -48,11 +48,12 @@
         <div id="setupScreen" class="setup-screen">
             <h2>Wächter-Profil</h2>
             
-            <!-- Profil-Auswahl-Menü -->
+                        <!-- Profil-Auswahl-Menü -->
             <label for="profileSelect" style="display:block; font-size:0.9rem; color:#aaa; margin-bottom:5px;">Übungs-Position:</label>
             <select id="profileSelect" class="profile-select">
-                <option value="STEHEND_RECK">Stehend (Hände über Kopf - Rücken)</option>
-                <!-- HIER KÖNNEN WIR SPÄTER EINFACH WEITERE OPTION-ZEILEN ERGÄNZEN -->
+                <option value="STEHEND_RECK">1. Stehend (Hände über Kopf)</option>
+                <option value="HINTER_KOPF">2. Stehend (Hände hinter dem Kopf)</option>
+                <option value="HINTER_RUECKEN">3. Stehend (Arme hinter dem Rücken)</option>
             </select>
 
             <div class="option-row"><span>1. Dynamische Checkpoints</span><label class="switch"><input type="checkbox" id="modAnchor" checked><span class="slider"></span></label></div>
@@ -72,17 +73,31 @@
                 <div id="ptRShoulder" class="joint-indicator"></div>
                 <div id="ptLWrist" class="joint-indicator"></div>
                 <div id="ptRWrist" class="joint-indicator"></div>
+                <div id="ptLElbow" class="joint-indicator" style="border: 4px solid #ff00ff; background: rgba(255,0,255,0.2);"></div>
+                <div id="ptREElbow" class="joint-indicator" style="border: 4px solid #ff00ff; background: rgba(255,0,255,0.2);"></div>                
             </div>
         </div>
     </div>
     <!-- NÄCHSTE NACHRICHT FOLGT MIT TEIL 2 -->
     <script>
-        // --- DIE DYNAMISCHE PROFIL-ARCHITEKTUR ---
+        // --- DIE ERWEITERTE PROFIL-ARCHITEKTUR ---
         const ACTIVE_PROFILES = {
             "STEHEND_RECK": {
                 joints: ['leftShoulder', 'rightShoulder', 'leftEar', 'rightEar', 'leftWrist', 'rightWrist'],
                 limits: { leftShoulder: 11, rightShoulder: 11, leftEar: 11, rightEar: 11, leftWrist: 15, rightWrist: 15 },
-                rules: { handsOverHead: true, checkPosture: true }
+                rules: { handsOverHead: true, handsBehindHead: false, armsBehindBack: false, checkPosture: true }
+            },
+            "HINTER_KOPF": {
+                // Hier überwachen wir zusätzlich die Ellbogen, da sie die Stabilität halten!
+                joints: ['leftShoulder', 'rightShoulder', 'leftEar', 'rightEar', 'leftElbow', 'rightElbow'],
+                limits: { leftShoulder: 10, rightShoulder: 10, leftEar: 10, rightEar: 10, leftElbow: 12, rightElbow: 12 },
+                rules: { handsOverHead: false, handsBehindHead: true, armsBehindBack: false, checkPosture: true }
+            },
+            "HINTER_RUECKEN": {
+                // Hüfte wird hier zum wichtigen Ankerpunkt für die Arme
+                joints: ['leftShoulder', 'rightShoulder', 'leftHip', 'rightHip', 'leftElbow', 'rightElbow'],
+                limits: { leftShoulder: 11, rightShoulder: 11, leftHip: 10, rightHip: 10, leftElbow: 14, rightElbow: 14 },
+                rules: { handsOverHead: false, handsBehindHead: false, armsBehindBack: true, checkPosture: true }
             }
         };
 
@@ -90,7 +105,7 @@
         const video = document.getElementById('webcam'), canvas = document.getElementById('processingCanvas'), ctx = canvas.getContext('2d');
         const container = document.getElementById('camContainer'), status = document.getElementById('status'), timerDisplay = document.getElementById('timerDisplay');
 
-        const pts = { head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist') };
+        const pts = { head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist'), lE: document.getElementById('ptLElbow'), rE: document.getElementById('ptREElbow') };
 
         let net = null, prevPose = null, anchorPose = {}, isPrepared = false, latestKeypoints = null; 
         let timeRemainingSeconds = 300, workoutInterval = null, movementDetectedTime = null, isGracePeriodActive = false, lastSpokenTime = 0;
@@ -114,20 +129,34 @@
 
         // --- DEINE GEOMETRISCHEN REGELN (ZENTRAL GEBÜNDELT) ---
         function validatePositionConditions() {
+            // Regel 1: Klassisch Hände hoch
             if (document.getElementById('modHands').checked && currentProfile.rules.handsOverHead) {
                 if (!f('leftEar') || !f('rightEar') || !f('leftWrist') || !f('rightWrist')) return false;
-                
-                const lW = latestKeypoints.leftWrist.position;
-                const rW = latestKeypoints.rightWrist.position;
-                
-                // Klon-Schutz gegen "halluzinierte" verdeckte Gelenke
-                const wristDistance = Math.sqrt(Math.pow(lW.x - rW.x, 2) + Math.pow(lW.y - rW.y, 2));
-                if (wristDistance < 5) return false; 
-
-                // Höhen-Check
+                const lW = latestKeypoints.leftWrist.position, rW = latestKeypoints.rightWrist.position;
+                if (Math.sqrt(Math.pow(lW.x - rW.x, 2) + Math.pow(lW.y - rW.y, 2)) < 5) return false; 
                 const headY = (latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y) / 2;
                 if (lW.y > headY || rW.y > headY) return false; 
             }
+            
+            // Regel 2: Hände hinter dem Kopf (Ellbogen-Check)
+            if (document.getElementById('modHands').checked && currentProfile.rules.handsBehindHead) {
+                if (!f('leftShoulder') || !f('rightShoulder') || !f('leftElbow') || !f('rightElbow')) return false;
+                // Ellbogen müssen weiter außen sein als die Schultern (X-Achse im gespiegelten Bild beachten)
+                // Bei korrekter Haltung ist der Abstand Ellbogen-Links zu Ellbogen-Rechts deutlich größer als Schulter zu Schulter
+                const shoulderDist = Math.abs(latestKeypoints.leftShoulder.position.x - latestKeypoints.rightShoulder.position.x);
+                const elbowDist = Math.abs(latestKeypoints.leftElbow.position.x - latestKeypoints.rightElbow.position.x);
+                if (elbowDist < (shoulderDist * 1.3)) return false; // Sacken die Ellbogen nach vorne, wird das Verhältnis kleiner
+            }
+
+            // Regel 3: Arme hinter dem Rücken verschränkt
+            if (document.getElementById('modHands').checked && currentProfile.rules.armsBehindBack) {
+                // PoseNet verliert hier oft die Handgelenke (da verdeckt). Wir prüfen deshalb die Ellbogen-Tiefe relativ zur Schulter!
+                if (!f('leftShoulder') || !f('rightShoulder') || !f('leftElbow') || !f('rightElbow')) return false;
+                const avgShoulderY = (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y) / 2;
+                // Die Ellbogen müssen zwingend weit unterhalb der Schultern bleiben (großer Y-Wert)
+                if (latestKeypoints.leftElbow.position.y < (avgShoulderY + 50) || latestKeypoints.rightElbow.position.y < (avgShoulderY + 50)) return false;
+            }
+
             if (document.getElementById('modPosture').checked && currentProfile.rules.checkPosture && f('leftShoulder') && f('rightShoulder') && Math.abs(latestKeypoints.leftShoulder.position.y - latestKeypoints.rightShoulder.position.y) > 22) return false;
             if (prevPose && f('leftShoulder') && f('rightShoulder')) {
                 const curX = (latestKeypoints.leftShoulder.position.x + latestKeypoints.rightShoulder.position.x)/2, curY = (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y)/2;
@@ -211,7 +240,7 @@
             // UI Indikatoren zeichnen
             const draw = (el, part) => { if (f(part)) { el.style.left = `${(latestKeypoints[part].position.x / 257) * container.clientWidth}px`; el.style.top = `${(latestKeypoints[part].position.y / 257) * container.clientHeight}px`; el.style.display = 'block'; } else { el.style.display = 'none'; } };
             draw(pts.lS, 'leftShoulder'); draw(pts.rS, 'rightShoulder'); draw(pts.lW, 'leftWrist'); draw(pts.rW, 'rightWrist');
-            if (f('leftEar') && f('rightEar')) { pts.head.style.left = `${(((latestKeypoints.leftEar.position.x + latestKeypoints.rightEar.position.x)/2) / 257) * container.clientWidth}px`; pts.head.style.top = `${(((latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y)/2) / 257) * container.clientHeight}px`; pts.head.style.display = 'block'; } else { pts.head.style.display = 'none'; }
+            draw(pts.lE, 'leftElbow'); draw(pts.rE, 'rightElbow'); // NEU: Zeichnet die lila Ellbogen-Punkte
 
             if (!isPrepared || !anchorPose || !currentProfile) return;
 
