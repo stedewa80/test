@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Dynamic Checkpoint Guardian</title>
+    <title>CornerTime - Final Showdown Guardian</title>
     <style>
         body { 
             background-color: #121212; 
@@ -123,7 +123,7 @@
         </div>
     </div>
 
-    <script {sandbox-attributes}>
+    <script>
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('processingCanvas');
         const ctx = canvas.getContext('2d');
@@ -139,13 +139,13 @@
         };
 
         let net = null;
-        let prevPose = null;   // Für die Echtzeit-Ruhe-Erkennung (Zappelfrei-Check)
-        let anchorPose = null; // Der dynamisch überschreibbare Kontrollpunkt
+        let prevPose = null;   
+        let anchorPose = null; 
         let isPrepared = false;
         let latestKeypoints = null; 
 
         // Variablen für das smarte Zeitfenster
-        let movementDetectedTime = null; // Wann brach die Bewegung aus?
+        let movementDetectedTime = null; 
         let isGracePeriodActive = false;
         let lastSpokenTime = 0;
 
@@ -205,7 +205,6 @@
             }
         }
 
-        // Hilfsfunktion: Speichert die aktuelle Position als unbestechlichen neuen Kontrollpunkt ein
         function setNewAnchor(audioMessage) {
             anchorPose = {
                 shoulder: {
@@ -229,6 +228,7 @@
             if (audioMessage) speak(audioMessage, true);
         }
 
+        // Schleife für die gespiegelte Videodarstellung im Canvas
         function loop() {
             canvas.width = 257; canvas.height = 257;
             const minDim = Math.min(video.videoWidth, video.videoHeight);
@@ -287,56 +287,34 @@
 
             if (!isPrepared || !anchorPose) return;
 
-            // --- BEDINGUNGEN PRÜFEN (MÜSSEN IMMER ERFÜLLT SEIN) ---
-            let conditionsMet = true;
-            let conditionAlert = "";
-            let conditionColor = "#ff3333";
-
-            // Bedingung A: Hände über Kopfhöhe (Ohren-Höhe von hinten)
-            if (document.getElementById('modHands').checked && foundLeftEar && foundRightEar) {
-                const headY = (lE.position.y + rE.position.y) / 2;
-                if ((foundLWrist && lW.position.y > headY) || (foundRWrist && rW.position.y > headY)) {
-                    conditionsMet = false;
-                    conditionAlert = "ARM-FEHLER: Hände runtergenommen! 🔵";
-                    conditionColor = "#3399ff";
-                    speak("Hände hoch");
+            // --- ZENTRALE VALIDIERUNGS-FUNKTION (DER SHOWDOWN) ---
+            function validateAllConditions() {
+                // 1. Hände-Höhe checken
+                if (document.getElementById('modHands').checked && foundLeftEar && foundRightEar) {
+                    const headY = (lE.position.y + rE.position.y) / 2;
+                    if ((foundLWrist && lW.position.y > headY) || (foundRWrist && rW.position.y > headY)) return false;
                 }
-            }
-
-            // Bedingung B: Haltung (Schulter-Neigung)
-            if (document.getElementById('modPosture').checked && foundLShoulder && foundRShoulder) {
-                const shoulderTilt = Math.abs(lS.position.y - rS.position.y);
-                if (shoulderTilt > 22) {
-                    conditionsMet = false;
-                    conditionAlert = "HALTUNGS-FEHLER: Schiefe Schultern! 🟡";
-                    conditionColor = "#ffcc00";
-                    speak("Gerade");
+                // 2. Haltung checken (Schulter-Neigung)
+                if (document.getElementById('modPosture').checked && foundLShoulder && foundRShoulder) {
+                    if (Math.abs(lS.position.y - rS.position.y) > 22) return false;
                 }
+                // 3. Anwesenheit checken
+                if (document.getElementById('modPresence').checked && (!foundLShoulder || !foundRShoulder)) return false;
+
+                // 4. Stillstands-Check im exakten Moment der Prüfung
+                if (prevPose && foundLShoulder && foundRShoulder) {
+                    const curX = (lS.position.x + rS.position.x)/2; const curY = (lS.position.y + rS.position.y)/2;
+                    if (Math.abs(curX - prevPose.shoulder.x) > 10 || Math.abs(curY - prevPose.shoulder.y) > 10) return false;
+                }
+
+                return true;
             }
 
-            // Bedingung C: Grund-Anwesenheit
-            if (document.getElementById('modPresence').checked && !foundLShoulder && !foundRShoulder) {
-                conditionsMet = false;
-                conditionAlert = "ANTI-CHEAT: Keine Person im Bild! 🔴";
-                speak("Fehler");
-            }
-
-            // Falls eine Grundbedingung verletzt ist, wird das Zeitfenster sofort blockiert!
-            if (!conditionsMet) {
-                status.innerText = conditionAlert;
-                status.style.color = conditionColor;
-                container.style.borderColor = conditionColor;
-                // Wir vergessen den Ausbruchs-Timer, da die Haltung erst wieder stimmen muss
-                movementDetectedTime = null; 
-                isGracePeriodActive = false;
-                return;
-            }
-
-            // --- REINE POSITIONS-ÜBERWACHUNG (DYNAMISCHER ANKER) ---
+            // --- DYNAMISCHE POSITIONS-ÜBERWACHUNG ---
             if (document.getElementById('modAnchor').checked) {
                 let positionShifted = false;
 
-                // Teste Abweichung vom gespeicherten Kontrollpunkt
+                // Teste Abweichung vom aktuell eingefrorenen Checkpoint
                 if (foundLShoulder && foundRShoulder) {
                     const shX = (lS.position.x + rS.position.x) / 2; const shY = (lS.position.y + rS.position.y) / 2;
                     if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > 11) positionShifted = true;
@@ -349,44 +327,38 @@
                 if (positionShifted) {
                     const now = Date.now();
                     
-                    // Erster Ausbruch: Wir starten das Zeitfenster
+                    // Erster Ausbruch: Timer im Hintergrund zünden
                     if (!isGracePeriodActive) {
                         isGracePeriodActive = true;
                         movementDetectedTime = now;
-                        speak("Position verloren", true);
+                        speak("Korrigiere", true);
                     }
 
                     const elapsedSeconds = Math.floor((now - movementDetectedTime) / 1000);
                     const remainingSeconds = 3 - elapsedSeconds;
 
                     if (remainingSeconds > 0) {
-                        status.innerText = `BEWEGUNG! Stabilisieren in ${remainingSeconds}s... ⏳`;
+                        status.innerText = `KORREKTURZEIT! Noch ${remainingSeconds}s... ⏳`;
                         status.style.color = "#ffaa00";
                         container.style.borderColor = "#ffaa00";
                         speak(remainingSeconds.toString());
                     } else {
-                        status.innerText = "ZEITFENSTER ABGELAUFEN! Position verloren! 🔴";
-                        status.style.color = "#ff3333";
-                        container.style.borderColor = "#ff3333";
-                        speak("Zeit abgelaufen");
+                        // DER FINALE SHOWDOWN: Jetzt ist die Zeit abgelaufen. Steht der User richtig?
+                        if (validateAllConditions()) {
+                            setNewAnchor("Checkpoint"); // Bestanden! Gerettet und neuer Checkpoint sitzt.
+                        } else {
+                            status.innerText = "ZEIT ABGELAUFEN! Haltung fehlerhaft! 🔴";
+                            status.style.color = "#ff3333";
+                            container.style.borderColor = "#ff3333";
+                            speak("Zeit abgelaufen");
+                        }
                     }
                 } else {
-                    // --- ZAPPEL-CHECK: VERSUCHT DER USER GERADE SICH NEU ZU STABILISIEREN? ---
-                    if (isGracePeriodActive) {
-                        // Wir prüfen, ob der Körper im aktuellen Frame komplett stillsteht (Zappelfrei-Test)
-                        let bodyIsMovingNow = false;
-                        if (prevPose && foundLShoulder && foundRShoulder) {
-                            const curX = (lS.position.x + rS.position.x)/2; const curY = (lS.position.y + rS.position.y)/2;
-                            if (Math.abs(curX - prevPose.shoulder.x) > 6 || Math.abs(curY - prevPose.shoulder.y) > 6) bodyIsMovingNow = true;
-                        }
-
-                        // Wenn er sich wegbewegt hat, aber jetzt stillsteht und die Bedingungen (oben geprüft) okay sind:
-                        if (!bodyIsMovingNow) {
-                            // BÄM! Neue Position einfrieren und weitermachen!
-                            setNewAnchor("Checkpoint");
-                        }
+                    // Falls du dich innerhalb der 3 Sekunden extrem schnell beruhigst,
+                    // nehmen wir das als fliegenden Checkpoint sofort dankend an.
+                    if (isGracePeriodActive && validateAllConditions()) {
+                        setNewAnchor("Checkpoint");
                     } else {
-                        // Alles perfekt im Lot
                         status.innerText = "Überwachung aktiv! 🟢";
                         status.style.color = "#00ffcc";
                         container.style.borderColor = "#333333";
@@ -394,7 +366,7 @@
                 }
             }
 
-            // Kurzzeit-Gedächtnis für den Zappelfrei-Check aktualisieren
+            // Kurzzeit-Gedächtnis für den Showdown-Stillstandscheck sichern
             prevPose = {
                 shoulder: (foundLShoulder && foundRShoulder) ? { x: (lS.position.x + rS.position.x)/2, y: (lS.position.y + rS.position.y)/2 } : null
             };
