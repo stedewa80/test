@@ -76,13 +76,11 @@
         </div>
     </div>
     <!-- NÄCHSTE NACHRICHT FOLGT MIT TEIL 2 -->
-            <script>
+    <script>
         // --- DIE DYNAMISCHE PROFIL-ARCHITEKTUR ---
         const ACTIVE_PROFILES = {
             "STEHEND_RECK": {
-                // Du kannst hier JEDEN gültigen PoseNet-Namen eintragen (z.B. leftHip, leftKnee, leftAnkle, leftElbow)
                 joints: ['leftShoulder', 'rightShoulder', 'leftEar', 'rightEar', 'leftWrist', 'rightWrist'],
-                // Die Limits müssen exakt so heißen wie das Gelenk im Array oben!
                 limits: { leftShoulder: 11, rightShoulder: 11, leftEar: 11, rightEar: 11, leftWrist: 15, rightWrist: 15 },
                 rules: { handsOverHead: true, checkPosture: true }
             }
@@ -92,7 +90,6 @@
         const video = document.getElementById('webcam'), canvas = document.getElementById('processingCanvas'), ctx = canvas.getContext('2d');
         const container = document.getElementById('camContainer'), status = document.getElementById('status'), timerDisplay = document.getElementById('timerDisplay');
 
-        // Die visuellen Punkte auf dem Bildschirm
         const pts = { head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist') };
 
         let net = null, prevPose = null, anchorPose = {}, isPrepared = false, latestKeypoints = null; 
@@ -112,6 +109,33 @@
             timerDisplay.innerText = `${mins}:${secs}`;
         }
 
+        // Helfer-Funktion für die Gelenk-Sichtbarkeit
+        function f(part) { return latestKeypoints && latestKeypoints[part] && latestKeypoints[part].score > 0.25; }
+
+        // --- DEINE GEOMETRISCHEN REGELN (ZENTRAL GEBÜNDELT) ---
+        function validatePositionConditions() {
+            if (document.getElementById('modHands').checked && currentProfile.rules.handsOverHead) {
+                if (!f('leftEar') || !f('rightEar') || !f('leftWrist') || !f('rightWrist')) return false;
+                
+                const lW = latestKeypoints.leftWrist.position;
+                const rW = latestKeypoints.rightWrist.position;
+                
+                // Klon-Schutz gegen "halluzinierte" verdeckte Gelenke
+                const wristDistance = Math.sqrt(Math.pow(lW.x - rW.x, 2) + Math.pow(lW.y - rW.y, 2));
+                if (wristDistance < 5) return false; 
+
+                // Höhen-Check
+                const headY = (latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y) / 2;
+                if (lW.y > headY || rW.y > headY) return false; 
+            }
+            if (document.getElementById('modPosture').checked && currentProfile.rules.checkPosture && f('leftShoulder') && f('rightShoulder') && Math.abs(latestKeypoints.leftShoulder.position.y - latestKeypoints.rightShoulder.position.y) > 22) return false;
+            if (prevPose && f('leftShoulder') && f('rightShoulder')) {
+                const curX = (latestKeypoints.leftShoulder.position.x + latestKeypoints.rightShoulder.position.x)/2, curY = (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y)/2;
+                if (Math.abs(curX - prevPose.shoulder.x) > 5 || Math.abs(curY - prevPose.shoulder.y) > 5) return false;
+            }
+            return true;
+        }
+
         async function startApp() {
             currentProfile = ACTIVE_PROFILES[document.getElementById('profileSelect').value];
             document.getElementById('setupScreen').style.display = 'none';
@@ -126,20 +150,17 @@
                     net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.50 });
                     status.innerText = "In Position gehen! (5s)"; status.style.color = "#ffaa00"; speak("In Position gehen", true);
                     loop();
-                    // Wartet 5 Sekunden, bis du an der Wand stehst
+                    
+                    // Start-Schleife: Wächter schaltet erst ein, wenn du richtig stehst!
                     setTimeout(() => {
-                        // Prüft, ob du da bist UND ob die Hände bereits oben sind
-                        if (latestKeypoints && latestKeypoints.leftShoulder && latestKeypoints.rightShoulder && validatePositionConditions()) { 
+                        if (f('leftShoulder') && f('rightShoulder') && validatePositionConditions()) { 
                             initWorkout(); 
                         } else {
                             status.innerText = "Bitte korrekte Haltung einnehmen (Hände hoch!)..."; 
                             status.style.color = "#ff3333";
-                            
-                            // Warteschleife: Versucht jede Sekunde neu, bis die Haltung stimmt
                             let retryAnchor = setInterval(() => { 
-                                if (latestKeypoints && latestKeypoints.leftShoulder && latestKeypoints.rightShoulder && validatePositionConditions()) { 
-                                    initWorkout(); 
-                                    clearInterval(retryAnchor); 
+                                if (f('leftShoulder') && f('rightShoulder') && validatePositionConditions()) { 
+                                    initWorkout(); clearInterval(retryAnchor); 
                                 } 
                             }, 1000);
                         }
@@ -162,14 +183,10 @@
             }, 1000);
         }
 
-        // VOLLAUTOMATISCH: Speichert jeden Punkt, den das Profil verlangt
         function setNewAnchor(audioMessage) {
             anchorPose = {}; 
             currentProfile.joints.forEach(jointName => {
-                const kp = latestKeypoints[jointName];
-                if (kp && kp.score > 0.25) {
-                    anchorPose[jointName] = { x: kp.position.x, y: kp.position.y };
-                }
+                if (f(jointName)) { anchorPose[jointName] = { x: latestKeypoints[jointName].position.x, y: latestKeypoints[jointName].position.y }; }
             });
             isPrepared = true; isGracePeriodActive = false; movementDetectedTime = null;
             status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333";
@@ -188,12 +205,10 @@
             if (!net || video.readyState < 2) return;
             const pose = await net.estimateSinglePose(canvas);
             
-            // VOLLAUTOMATISCH: Wir mappen alle PoseNet-Keypoints dynamisch in ein Objekt
             latestKeypoints = {};
             pose.keypoints.forEach(k => { latestKeypoints[k.part] = k; });
 
-            // Klassische Indikatoren zeichnen (bleibt für die UI visuell unverändert)
-            const f = (part) => latestKeypoints[part] && latestKeypoints[part].score > 0.25;
+            // UI Indikatoren zeichnen
             const draw = (el, part) => { if (f(part)) { el.style.left = `${(latestKeypoints[part].position.x / 257) * container.clientWidth}px`; el.style.top = `${(latestKeypoints[part].position.y / 257) * container.clientHeight}px`; el.style.display = 'block'; } else { el.style.display = 'none'; } };
             draw(pts.lS, 'leftShoulder'); draw(pts.rS, 'rightShoulder'); draw(pts.lW, 'leftWrist'); draw(pts.rW, 'rightWrist');
             if (f('leftEar') && f('rightEar')) { pts.head.style.left = `${(((latestKeypoints.leftEar.position.x + latestKeypoints.rightEar.position.x)/2) / 257) * container.clientWidth}px`; pts.head.style.top = `${(((latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y)/2) / 257) * container.clientHeight}px`; pts.head.style.display = 'block'; } else { pts.head.style.display = 'none'; }
@@ -206,46 +221,15 @@
                 clearInterval(workoutInterval); isPrepared = false; return;
             }
 
-                        function validatePositionConditions() {
-                if (document.getElementById('modHands').checked && currentProfile.rules.handsOverHead) {
-                    // 1. Sichtbarkeits-Check: Sind überhaupt beide Hände sauber erkannt?
-                    if (!f('leftEar') || !f('rightEar') || !f('leftWrist') || !f('rightWrist')) return false;
-                    
-                    const lW = latestKeypoints.leftWrist.position;
-                    const rW = latestKeypoints.rightWrist.position;
-                    
-                    // 2. Klon-Schutz (NEU!): Wenn sich die Punkte überlagern, ist eine Hand verdeckt
-                    const wristDistance = Math.sqrt(Math.pow(lW.x - rW.x, 2) + Math.pow(lW.y - rW.y, 2));
-                    if (wristDistance < 5) return false; // Verhindert das "Doppelgänger"-Schummeln
-
-                    // 3. Höhen-Check: Sind beide Hände über Kopfhöhe?
-                    const headY = (latestKeypoints.leftEar.position.y + latestKeypoints.rightEar.position.y) / 2;
-                    if (lW.y > headY || rW.y > headY) return false; 
-                }
-                
-                if (document.getElementById('modPosture').checked && currentProfile.rules.checkPosture && f('leftShoulder') && f('rightShoulder') && Math.abs(latestKeypoints.leftShoulder.position.y - latestKeypoints.rightShoulder.position.y) > 22) return false;
-                
-                if (prevPose && f('leftShoulder') && f('rightShoulder')) {
-                    const curX = (latestKeypoints.leftShoulder.position.x + latestKeypoints.rightShoulder.position.x)/2, curY = (latestKeypoints.leftShoulder.position.y + latestKeypoints.rightShoulder.position.y)/2;
-                    if (Math.abs(curX - prevPose.shoulder.x) > 5 || Math.abs(curY - prevPose.shoulder.y) > 5) return false;
-                }
-                return true;
-            }
-
-
-            // --- VOLLAUTOMATISCHE LIVE-ÜBERWACHUNG ---
+            // --- LIVE-ÜBERWACHUNG ---
             if (document.getElementById('modAnchor').checked) {
                 let positionShifted = false;
 
-                // Gehe jeden im Profil hinterlegten Punkt durch und vergleiche ihn mit seinem Anker
                 currentProfile.joints.forEach(jointName => {
                     if (f(jointName) && anchorPose[jointName]) {
                         const cur = latestKeypoints[jointName].position;
                         const anc = anchorPose[jointName];
-                        const dist = Math.sqrt(Math.pow(cur.x - anc.x, 2) + Math.pow(cur.y - anc.y, 2));
-                        
-                        // Wenn der erlaubte Grenzwert für dieses spezifische Gelenk überschritten wird
-                        if (dist > currentProfile.limits[jointName]) { positionShifted = true; }
+                        if (Math.sqrt(Math.pow(cur.x - anc.x, 2) + Math.pow(cur.y - anc.y, 2)) > currentProfile.limits[jointName]) { positionShifted = true; }
                     }
                 });
 
