@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Professional Dual-Motion Guardian</title>
+    <title>CornerTime - Dynamic Checkpoint Guardian</title>
     <style>
         body { 
             background-color: #121212; 
@@ -73,7 +73,7 @@
         
         canvas#processingCanvas { display: block; width: 100%; height: 100%; object-fit: cover; }
         
-        /* Unblockbare HTML-Indikatoren */
+        /* Unblockbare HTML-Indikatoren (Live-Punkte) */
         .joint-indicator { 
             position: absolute; width: 25px; height: 25px; border-radius: 50%; 
             pointer-events: none; display: none; z-index: 9999; transform: translate(-50%, -50%); 
@@ -98,11 +98,10 @@
         <!-- SETUP SCREEN -->
         <div id="setupScreen" class="setup-screen">
             <h2>Wächter-Konfig</h2>
-            <div class="option-row"><span>1. Bewegung (Zucken/Zappeln)</span><label class="switch"><input type="checkbox" id="modMotion" checked><span class="slider"></span></label></div>
-            <div class="option-row"><span>2. Positions-Anker (Anti-Schleich)</span><label class="switch"><input type="checkbox" id="modAnchor"><span class="slider"></span></label></div>
-            <div class="option-row"><span>3. Anwesenheit (Anti-Cheat)</span><label class="switch"><input type="checkbox" id="modPresence" checked><span class="slider"></span></label></div>
-            <div class="option-row"><span>4. Hände-Kontrolle (Höhe)</span><label class="switch"><input type="checkbox" id="modHands" checked><span class="slider"></span></label></div>
-            <div class="option-row"><span>5. Haltung (Schulter-Neigung)</span><label class="switch"><input type="checkbox" id="modPosture"><span class="slider"></span></label></div>
+            <div class="option-row"><span>1. Dynamische Checkpoints</span><label class="switch"><input type="checkbox" id="modAnchor" checked><span class="slider"></span></label></div>
+            <div class="option-row"><span>2. Anwesenheit (Anti-Cheat)</span><label class="switch"><input type="checkbox" id="modPresence" checked><span class="slider"></span></label></div>
+            <div class="option-row"><span>3. Hände über Kopf (Pflicht)</span><label class="switch"><input type="checkbox" id="modHands" checked><span class="slider"></span></label></div>
+            <div class="option-row"><span>4. Haltung (Schulter-Neigung)</span><label class="switch"><input type="checkbox" id="modPosture"><span class="slider"></span></label></div>
             <button class="start-btn" onclick="startApp()">ÜBERWACHUNG STARTEN</button>
         </div>
 
@@ -114,7 +113,7 @@
                 <video id="webcam" autoplay playsinline muted style="display:none;"></video>
                 <canvas id="processingCanvas"></canvas>
                 
-                <!-- Sichtbare Tracking-Punkte -->
+                <!-- Live-Tracking-Punkte -->
                 <div id="ptHead" class="joint-indicator"></div>
                 <div id="ptLShoulder" class="joint-indicator"></div>
                 <div id="ptRShoulder" class="joint-indicator"></div>
@@ -124,7 +123,7 @@
         </div>
     </div>
 
-    <script>
+    <script {sandbox-attributes}>
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('processingCanvas');
         const ctx = canvas.getContext('2d');
@@ -140,12 +139,30 @@
         };
 
         let net = null;
-        let prevPose = null;   // Für Wächter 1 (Kurzzeit-Vergleich 350ms)
-        let anchorPose = null; // Für Wächter 2 (Langzeit-Urstartpunkt)
+        let prevPose = null;   // Für die Echtzeit-Ruhe-Erkennung (Zappelfrei-Check)
+        let anchorPose = null; // Der dynamisch überschreibbare Kontrollpunkt
         let isPrepared = false;
         let latestKeypoints = null; 
 
+        // Variablen für das smarte Zeitfenster
+        let movementDetectedTime = null; // Wann brach die Bewegung aus?
+        let isGracePeriodActive = false;
+        let lastSpokenTime = 0;
+
+        function speak(text, force = false) {
+            const now = Date.now();
+            if (!force && (now - lastSpokenTime < 1500)) return; 
+            lastSpokenTime = now;
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'de-DE';
+            utterance.rate = 1.3;
+            window.speechSynthesis.speak(utterance);
+        }
+
         async function startApp() {
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+
             document.getElementById('setupScreen').style.display = 'none';
             document.getElementById('activeScreen').style.display = 'block';
             
@@ -161,19 +178,19 @@
                     
                     status.innerText = "In Position gehen! (5s)";
                     status.style.color = "#ffaa00";
+                    speak("In Position gehen");
                     
                     loop();
                     
-                    // Nach 5 Sekunden wird die exakte IST-Position als unbestechlicher Ur-Anker eingefroren
                     setTimeout(() => {
                         if (latestKeypoints && latestKeypoints.foundLShoulder && latestKeypoints.foundRShoulder) {
-                            freezeAnchor();
+                            setNewAnchor("Wächter aktiv");
                         } else {
                             status.innerText = "Bitte SICHTBAR vor die Wand stellen...";
                             status.style.color = "#ff3333";
                             let retryAnchor = setInterval(() => {
                                 if (latestKeypoints && latestKeypoints.foundLShoulder && latestKeypoints.foundRShoulder) {
-                                    freezeAnchor();
+                                    setNewAnchor("Wächter aktiv");
                                     clearInterval(retryAnchor);
                                 }
                             }, 1000);
@@ -188,7 +205,8 @@
             }
         }
 
-        function freezeAnchor() {
+        // Hilfsfunktion: Speichert die aktuelle Position als unbestechlichen neuen Kontrollpunkt ein
+        function setNewAnchor(audioMessage) {
             anchorPose = {
                 shoulder: {
                     x: (latestKeypoints.lS.position.x + latestKeypoints.rS.position.x) / 2,
@@ -201,9 +219,14 @@
                 lWrist: latestKeypoints.foundLWrist ? { x: latestKeypoints.lW.position.x, y: latestKeypoints.lW.position.y } : null,
                 rWrist: latestKeypoints.foundRWrist ? { x: latestKeypoints.rW.position.x, y: latestKeypoints.rW.position.y } : null
             };
+
             isPrepared = true;
+            isGracePeriodActive = false;
+            movementDetectedTime = null;
             status.innerText = "Überwachung aktiv! 🟢";
             status.style.color = "#00ffcc";
+            container.style.borderColor = "#333333";
+            if (audioMessage) speak(audioMessage, true);
         }
 
         function loop() {
@@ -262,89 +285,119 @@
             drawIndicator(pts.lW, lW, foundLWrist);
             drawIndicator(pts.rW, rW, foundRWrist);
 
-            if (!isPrepared) return;
+            if (!isPrepared || !anchorPose) return;
 
-            let currentAlert = "Überwachung aktiv! 🟢";
-            let currentColor = "#00ffcc";
-            let borderColor = "#333333";
+            // --- BEDINGUNGEN PRÜFEN (MÜSSEN IMMER ERFÜLLT SEIN) ---
+            let conditionsMet = true;
+            let conditionAlert = "";
+            let conditionColor = "#ff3333";
 
-            // --- WÄCHTER 1: KLASSISCHE BEWEGUNG (ZUCKEN / SCHNELLE BEWEGUNG) ---
-            if (document.getElementById('modMotion').checked && prevPose) {
-                let rapidMovement = false;
-
-                if (foundLeftEar && foundRightEar && prevPose.head) {
-                    const headX = (lE.position.x + rE.position.x) / 2; const headY = (lE.position.y + rE.position.y) / 2;
-                    if (Math.abs(headX - prevPose.head.x) > 8 || Math.abs(headY - prevPose.head.y) > 8) rapidMovement = true;
-                }
-                if (foundLShoulder && foundRShoulder && prevPose.shoulder) {
-                    const shX = (lS.position.x + rS.position.x) / 2; const shY = (lS.position.y + rS.position.y) / 2;
-                    if (Math.abs(shX - prevPose.shoulder.x) > 8 || Math.abs(shY - prevPose.shoulder.y) > 8) rapidMovement = true;
-                }
-                if (foundLWrist && prevPose.lWrist && (Math.abs(lW.position.x - prevPose.lWrist.x) > 12 || Math.abs(lW.position.y - prevPose.lWrist.y) > 12)) rapidMovement = true;
-                if (foundRWrist && prevPose.rWrist && (Math.abs(rW.position.x - prevPose.rWrist.x) > 12 || Math.abs(rW.position.y - prevPose.rWrist.y) > 12)) rapidMovement = true;
-
-                if (rapidMovement) {
-                    currentAlert = "BEWEGUNG DETEKTIERT! Stillstehen! 🔴";
-                    currentColor = "#ff3333"; borderColor = "#ff3333";
-                }
-            }
-            
-            // Kurzzeit-Gedächtnis für Wächter 1 überschreiben
-            prevPose = {
-                head: (foundLeftEar && foundRightEar) ? { x: (lE.position.x + rE.position.x)/2, y: (lE.position.y + rE.position.y)/2 } : null,
-                shoulder: (foundLShoulder && foundRShoulder) ? { x: (lS.position.x + rS.position.x)/2, y: (lS.position.y + rS.position.y)/2 } : null,
-                lWrist: foundLWrist ? { x: lW.position.x, y: lW.position.y } : null,
-                rWrist: foundRWrist ? { x: rW.position.x, y: rW.position.y } : null
-            };
-
-            // --- WÄCHTER 2: POSITIONS-ANKER (ANTI-SCHLEICH / LANGZEIT) ---
-            if (document.getElementById('modAnchor').checked && anchorPose) {
-                let anchorViolated = false;
-
-                if (foundLShoulder && foundRShoulder) {
-                    const shX = (lS.position.x + rS.position.x) / 2; const shY = (lS.position.y + rS.position.y) / 2;
-                    if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > 11) anchorViolated = true;
-                }
-                if (foundLeftEar && foundRightEar && anchorPose.head) {
-                    const hdX = (lE.position.x + rE.position.x) / 2; const hdY = (lE.position.y + rE.position.y) / 2;
-                    if (Math.sqrt(Math.pow(hdX - anchorPose.head.x, 2) + Math.pow(hdY - anchorPose.head.y, 2)) > 11) anchorViolated = true;
-                }
-                if (foundLWrist && anchorPose.lWrist && Math.sqrt(Math.pow(lW.position.x - anchorPose.lWrist.x, 2) + Math.pow(lW.position.y - anchorPose.lWrist.y, 2)) > 15) anchorViolated = true;
-                if (foundRWrist && anchorPose.rWrist && Math.sqrt(Math.pow(rW.position.x - anchorPose.rWrist.x, 2) + Math.pow(rW.position.y - anchorPose.rWrist.y, 2)) > 15) anchorViolated = true;
-
-                if (anchorViolated) {
-                    currentAlert = "POSITIONSVERLUST! Zurück zum Startpunkt! 🔴";
-                    currentColor = "#ff3333"; borderColor = "#ff3333";
-                }
-            }
-
-            // --- WÄCHTER 3: ANWESENHEIT ---
-            if (document.getElementById('modPresence').checked && !foundLShoulder && !foundRShoulder) {
-                currentAlert = "ANTI-CHEAT: Keine Person erkannt! 🔴";
-                currentColor = "#ff3333"; borderColor = "#ff3333";
-            }
-
-            // --- WÄCHTER 4: HÄNDE UNTER KOPFHÖHE ---
+            // Bedingung A: Hände über Kopfhöhe (Ohren-Höhe von hinten)
             if (document.getElementById('modHands').checked && foundLeftEar && foundRightEar) {
                 const headY = (lE.position.y + rE.position.y) / 2;
                 if ((foundLWrist && lW.position.y > headY) || (foundRWrist && rW.position.y > headY)) {
-                    currentAlert = "HÄNDE HOCH! Arme sind zu tief! 🔵";
-                    currentColor = "#3399ff"; borderColor = "#3399ff";
+                    conditionsMet = false;
+                    conditionAlert = "ARM-FEHLER: Hände runtergenommen! 🔵";
+                    conditionColor = "#3399ff";
+                    speak("Hände hoch");
                 }
             }
 
-            // --- WÄCHTER 5: HALTUNG (SCHULTER-NEIGUNG) ---
+            // Bedingung B: Haltung (Schulter-Neigung)
             if (document.getElementById('modPosture').checked && foundLShoulder && foundRShoulder) {
                 const shoulderTilt = Math.abs(lS.position.y - rS.position.y);
                 if (shoulderTilt > 22) {
-                    currentAlert = "HALTUNG KORRIGIEREN! Gerade hinstellen! 🟡";
-                    currentColor = "#ffcc00"; borderColor = "#ffcc00";
+                    conditionsMet = false;
+                    conditionAlert = "HALTUNGS-FEHLER: Schiefe Schultern! 🟡";
+                    conditionColor = "#ffcc00";
+                    speak("Gerade");
                 }
             }
 
-            status.innerText = currentAlert;
-            status.style.color = currentColor;
-            container.style.borderColor = borderColor;
+            // Bedingung C: Grund-Anwesenheit
+            if (document.getElementById('modPresence').checked && !foundLShoulder && !foundRShoulder) {
+                conditionsMet = false;
+                conditionAlert = "ANTI-CHEAT: Keine Person im Bild! 🔴";
+                speak("Fehler");
+            }
+
+            // Falls eine Grundbedingung verletzt ist, wird das Zeitfenster sofort blockiert!
+            if (!conditionsMet) {
+                status.innerText = conditionAlert;
+                status.style.color = conditionColor;
+                container.style.borderColor = conditionColor;
+                // Wir vergessen den Ausbruchs-Timer, da die Haltung erst wieder stimmen muss
+                movementDetectedTime = null; 
+                isGracePeriodActive = false;
+                return;
+            }
+
+            // --- REINE POSITIONS-ÜBERWACHUNG (DYNAMISCHER ANKER) ---
+            if (document.getElementById('modAnchor').checked) {
+                let positionShifted = false;
+
+                // Teste Abweichung vom gespeicherten Kontrollpunkt
+                if (foundLShoulder && foundRShoulder) {
+                    const shX = (lS.position.x + rS.position.x) / 2; const shY = (lS.position.y + rS.position.y) / 2;
+                    if (Math.sqrt(Math.pow(shX - anchorPose.shoulder.x, 2) + Math.pow(shY - anchorPose.shoulder.y, 2)) > 11) positionShifted = true;
+                }
+                if (foundLeftEar && foundRightEar && anchorPose.head) {
+                    const hdX = (lE.position.x + rE.position.x) / 2; const hdY = (lE.position.y + rE.position.y) / 2;
+                    if (Math.sqrt(Math.pow(hdX - anchorPose.head.x, 2) + Math.pow(hdY - anchorPose.head.y, 2)) > 11) positionShifted = true;
+                }
+
+                if (positionShifted) {
+                    const now = Date.now();
+                    
+                    // Erster Ausbruch: Wir starten das Zeitfenster
+                    if (!isGracePeriodActive) {
+                        isGracePeriodActive = true;
+                        movementDetectedTime = now;
+                        speak("Position verloren", true);
+                    }
+
+                    const elapsedSeconds = Math.floor((now - movementDetectedTime) / 1000);
+                    const remainingSeconds = 3 - elapsedSeconds;
+
+                    if (remainingSeconds > 0) {
+                        status.innerText = `BEWEGUNG! Stabilisieren in ${remainingSeconds}s... ⏳`;
+                        status.style.color = "#ffaa00";
+                        container.style.borderColor = "#ffaa00";
+                        speak(remainingSeconds.toString());
+                    } else {
+                        status.innerText = "ZEITFENSTER ABGELAUFEN! Position verloren! 🔴";
+                        status.style.color = "#ff3333";
+                        container.style.borderColor = "#ff3333";
+                        speak("Zeit abgelaufen");
+                    }
+                } else {
+                    // --- ZAPPEL-CHECK: VERSUCHT DER USER GERADE SICH NEU ZU STABILISIEREN? ---
+                    if (isGracePeriodActive) {
+                        // Wir prüfen, ob der Körper im aktuellen Frame komplett stillsteht (Zappelfrei-Test)
+                        let bodyIsMovingNow = false;
+                        if (prevPose && foundLShoulder && foundRShoulder) {
+                            const curX = (lS.position.x + rS.position.x)/2; const curY = (lS.position.y + rS.position.y)/2;
+                            if (Math.abs(curX - prevPose.shoulder.x) > 6 || Math.abs(curY - prevPose.shoulder.y) > 6) bodyIsMovingNow = true;
+                        }
+
+                        // Wenn er sich wegbewegt hat, aber jetzt stillsteht und die Bedingungen (oben geprüft) okay sind:
+                        if (!bodyIsMovingNow) {
+                            // BÄM! Neue Position einfrieren und weitermachen!
+                            setNewAnchor("Checkpoint");
+                        }
+                    } else {
+                        // Alles perfekt im Lot
+                        status.innerText = "Überwachung aktiv! 🟢";
+                        status.style.color = "#00ffcc";
+                        container.style.borderColor = "#333333";
+                    }
+                }
+            }
+
+            // Kurzzeit-Gedächtnis für den Zappelfrei-Check aktualisieren
+            prevPose = {
+                shoulder: (foundLShoulder && foundRShoulder) ? { x: (lS.position.x + rS.position.x)/2, y: (lS.position.y + rS.position.y)/2 } : null
+            };
         }
     </script>
 </body>
