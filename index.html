@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Smart Wächter (MediaPipe)</title>
+    <title>CornerTime - Pro Wächter (MediaPipe)</title>
     <style>
         body { 
             background-color: #121212; color: #fff; 
@@ -13,15 +13,10 @@
         }
         .app-container { width: 100%; max-width: 400px; text-align: center; }
         .setup-screen { background: #1e1e1e; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: left; }
-        h2 { text-align: center; margin-top: 0; color: #00ffcc; margin-bottom: 20px; }
-        h3 { font-size: 0.9rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; margin-top: 20px; }
+        h2 { text-align: center; color: #00ffcc; margin-top: 0; margin-bottom: 20px; }
+        h3 { font-size: 0.9rem; color: #aaa; text-transform: uppercase; margin-top: 20px; letter-spacing: 1px; }
         .option-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        
-        select.custom-select {
-            width: 100%; background: #2a2a2a; color: #fff; border: 2px solid #007aff;
-            padding: 12px; border-radius: 10px; font-size: 1rem; font-weight: bold;
-            outline: none; cursor: pointer;
-        }
+        .custom-select { width: 100%; background: #2a2a2a; color: #fff; border: 2px solid #007aff; padding: 12px; border-radius: 10px; font-size: 1rem; font-weight: bold; cursor: pointer; outline: none; }
         
         .switch { position: relative; display: inline-block; width: 46px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -30,18 +25,12 @@
         input:checked + .slider { background-color: #007aff; }
         input:checked + .slider:before { transform: translateX(20px); }
         input:disabled + .slider { background-color: #222; cursor: not-allowed; }
-        input:disabled + .slider:before { background-color: #555; }
         
-        .timer-display { font-size: 3.5rem; font-weight: 800; color: #ffffff; margin-bottom: 5px; font-variant-numeric: tabular-nums; transition: color 0.3s; }
+        .timer-display { font-size: 3.5rem; font-weight: 800; margin-bottom: 5px; font-variant-numeric: tabular-nums; transition: color 0.3s; }
         #activeScreen { display: none; width: 100%; }
-        .status-message { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; min-height: 2rem; color: #00ffcc; text-align: center; }
-        .camera-box { width: 100%; border-radius: 20px; border: 8px solid #333333; overflow: hidden; background: #000000; position: relative; aspect-ratio: 1 / 1; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: border-color 0.2s, box-shadow 0.2s; }
+        .status-message { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; min-height: 2rem; color: #00ffcc; }
+        .camera-box { width: 100%; border-radius: 20px; border: 8px solid #333333; overflow: hidden; background: #000; position: relative; aspect-ratio: 1 / 1; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: border-color 0.2s; }
         canvas#processingCanvas { display: block; width: 100%; height: 100%; object-fit: cover; }
-        .joint-indicator { position: absolute; width: 25px; height: 25px; border-radius: 50%; pointer-events: none; display: none; z-index: 9999; transform: translate(-50%, -50%); }
-        #ptHead { border: 4px solid #00ffcc; background: rgba(0,255,204,0.2); }
-        #ptLShoulder, #ptRShoulder { border: 4px solid #28a745; background: rgba(40,167,69,0.2); }
-        #ptLWrist, #ptRWrist { border: 4px solid #3399ff; background: rgba(51,153,255,0.2); }
-        #ptLElbow, #ptRElbow { border: 4px solid #ff00ff; background: rgba(255,0,255,0.2); }
         button.start-btn { background: #007aff; color: white; border: none; padding: 16px; font-size: 1.2rem; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 20px; width: 100%; box-shadow: 0 4px 10px rgba(0,122,255,0.3); }
     </style>
     
@@ -53,22 +42,21 @@
 <body>
     <div class="app-container">
         <div id="setupScreen" class="setup-screen">
-            <h2>Wächter Konfigurator</h2>
-            
-            <h3>1. Position wählen</h3>
+            <h2>Wächter Pro</h2>
+            <h3>1. Position</h3>
             <select id="positionSelect" class="custom-select" onchange="adaptRulesToPosition()">
                 <option value="STEHEND">Stehend (An der Wand)</option>
                 <option value="KNIEND">Kniend (Frei / Wand)</option>
             </select>
-
-            <h3>2. Arm-Haltung wählen</h3>
-            <div class="option-row"><span>Hände über dem Kopf</span><label class="switch"><input type="checkbox" id="ruleOverHead" checked onchange="toggleExclusiveRules('ruleOverHead')"><span class="slider"></span></label></div>
-            <div class="option-row"><span>Hände hinter dem Kopf</span><label class="switch"><input type="checkbox" id="ruleBehindHead" onchange="toggleExclusiveRules('ruleBehindHead')"><span class="slider"></span></label></div>
-            <div class="option-row" id="rowBehindBack"><span>Arme hinter dem Rücken</span><label class="switch"><input type="checkbox" id="ruleBehindBack" onchange="toggleExclusiveRules('ruleBehindBack')"><span class="slider"></span></label></div>
-
-            <h3>3. Symmetrie-Filter</h3>
-            <div class="option-row"><span>Schulter-Geradehaltung</span><label class="switch"><input type="checkbox" id="ruleSymmetry"><span class="slider"></span></label></div>
-
+            
+            <h3>2. Arm-Regel</h3>
+            <div class="option-row"><span>Hände über Kopf</span><label class="switch"><input type="checkbox" id="ruleOverHead" checked onchange="toggleExclusiveRules('ruleOverHead')"><span class="slider"></span></label></div>
+            <div class="option-row"><span>Hände hinter Kopf</span><label class="switch"><input type="checkbox" id="ruleBehindHead" onchange="toggleExclusiveRules('ruleBehindHead')"><span class="slider"></span></label></div>
+            <div class="option-row" id="rowBehindBack"><span>Arme hinter Rücken</span><label class="switch"><input type="checkbox" id="ruleBehindBack" onchange="toggleExclusiveRules('ruleBehindBack')"><span class="slider"></span></label></div>
+            
+            <h3>3. Symmetrie</h3>
+            <div class="option-row"><span>Schulter-Neigung filtern</span><label class="switch"><input type="checkbox" id="ruleSymmetry"><span class="slider"></span></label></div>
+            
             <button class="start-btn" onclick="startApp()">ÜBERWACHUNG STARTEN</button>
         </div>
         
@@ -78,49 +66,35 @@
             <div class="camera-box" id="camContainer">
                 <video id="webcam" autoplay playsinline muted style="display:none;"></video>
                 <canvas id="processingCanvas"></canvas>
-                <div id="ptHead" class="joint-indicator"></div>
-                <div id="ptLShoulder" class="joint-indicator"></div>
-                <div id="ptRShoulder" class="joint-indicator"></div>
-                <div id="ptLWrist" class="joint-indicator"></div>
-                <div id="ptRWrist" class="joint-indicator"></div>
-                <div id="ptLElbow" class="joint-indicator"></div>
-                <div id="ptRElbow" class="joint-indicator"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // Logische Profile im Hintergrund je nach aktivierter Haltung
+        // Logische Profile im Hintergrund mit prozentualen Toleranzen (skaliert über Schulberbreite)
         const DYNAMIC_LIMITS = {
-            headOver: { joints: ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_wrist', 'right_wrist'], lim: { shoulder: 12, head: 12, target: 16 } },
-            headBehind: { joints: ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_elbow', 'right_elbow'], lim: { shoulder: 11, head: 11, target: 13 } },
-            backBehind: { joints: ['left_shoulder', 'right_shoulder', 'left_hip', 'right_hip', 'left_elbow', 'right_elbow'], lim: { shoulder: 12, head: 11, target: 15 } }
+            headOver: { joints: ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_wrist', 'right_wrist'], lim: { shoulder: 0.12, head: 0.12, target: 0.16 } },
+            headBehind: { joints: ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_elbow', 'right_elbow'], lim: { shoulder: 0.10, head: 0.10, target: 0.13 } },
+            backBehind: { joints: ['left_shoulder', 'right_shoulder', 'left_hip', 'right_hip', 'left_elbow', 'right_elbow'], lim: { shoulder: 0.11, head: 0.11, target: 0.15 } }
         };
 
-        let currentConfig = { pos: "STEHEND", mode: "headOver", symmetry: false };
+        // DOM Elemente sauber deklariert
         const video = document.getElementById('webcam'), canvas = document.getElementById('processingCanvas'), ctx = canvas.getContext('2d');
         const container = document.getElementById('camContainer'), status = document.getElementById('status'), timerDisplay = document.getElementById('timerDisplay');
-        const pts = { head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist'), lE: document.getElementById('ptLElbow'), rE: document.getElementById('ptRElbow') };
 
-        let detector = null, anchorPose = null, isPrepared = false, latestKeypoints = {}; 
-        let timeRemainingSeconds = 300, workoutInterval = null, movementDetectedTime = null, isGracePeriodActive = false, lastSpokenTime = 0, errorCounter = 0;
+        let currentConfig = { pos: "STEHEND", mode: "headOver", symmetry: false };
+        let detector = null, anchorPose = {}, isPrepared = false, latestKeypoints = {}, baseShoulderWidth = 100;
+        let timeRemainingSeconds = 300, workoutInterval = null, isGracePeriodActive = false, lastSpokenTime = 0, errorCounter = 0, remainingSecondsCounter = 3;
 
-        // --- INTELLIGENTE MENÜ-STEUERUNG ---
         function adaptRulesToPosition() {
             const pos = document.getElementById('positionSelect').value;
             const rowBehindBack = document.getElementById('rowBehindBack');
             const cbBehindBack = document.getElementById('ruleBehindBack');
-            
             if (pos === "KNIEND") {
-                rowBehindBack.style.opacity = "0.3";
-                cbBehindBack.disabled = true;
-                if (cbBehindBack.checked) {
-                    cbBehindBack.checked = false;
-                    document.getElementById('ruleOverHead').checked = true;
-                }
+                rowBehindBack.style.opacity = "0.3"; cbBehindBack.disabled = true;
+                if (cbBehindBack.checked) { cbBehindBack.checked = false; document.getElementById('ruleOverHead').checked = true; }
             } else {
-                rowBehindBack.style.opacity = "1";
-                cbBehindBack.disabled = false;
+                rowBehindBack.style.opacity = "1"; cbBehindBack.disabled = false;
             }
         }
 
@@ -128,18 +102,16 @@
             const rules = ['ruleOverHead', 'ruleBehindHead', 'ruleBehindBack'];
             if (document.getElementById(activeId).checked) {
                 rules.forEach(id => { if (id !== activeId) document.getElementById(id).checked = false; });
-            } else {
-                // Wenn man eine Regel ausschaltet, wird automatisch "Hände über Kopf" der Fallback
-                if (!rules.some(id => document.getElementById(id).checked)) {
-                    document.getElementById('ruleOverHead').checked = true;
-                }
+            } else if (!rules.some(id => document.getElementById(id).checked)) {
+                document.getElementById('ruleOverHead').checked = true;
             }
         }
 
         function speak(text, force = false) {
             try {
-                const now = Date.now(); if (!force && (now - lastSpokenTime < 1200)) return; lastSpokenTime = now;
-                const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'de-DE'; utterance.rate = 1.3; window.speechSynthesis.speak(utterance);
+                if (force) { window.speechSynthesis.cancel(); }
+                const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'de-DE'; utterance.rate = 1.1;
+                window.speechSynthesis.speak(utterance);
             } catch (e) { console.log("Audiofehler:", e); }
         }
 
@@ -150,34 +122,26 @@
             timerDisplay.innerText = `${mins}:${secs}`;
         }
 
-        function f(part) { return latestKeypoints && latestKeypoints[part] && latestKeypoints[part].score > 0.4; }
+        function f(part) { return latestKeypoints[part] && latestKeypoints[part].score > 0.4; }
 
-        // --- DYNAMISCHE BIOLOGISCHE PRÜFUNG ---
+        // --- BIOLOGISCHE HALTUNGS-VERIFIKATION ---
         function validatePositionConditions() {
-            // Regel A: Hände über Kopf
             if (currentConfig.mode === "headOver") {
                 if (!f('left_ear') || !f('right_ear') || !f('left_wrist') || !f('right_wrist')) return false;
                 const headY = (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2;
                 if (latestKeypoints.left_wrist.y > headY || latestKeypoints.right_wrist.y > headY) return false; 
             }
-            
-            // Regel B: Hände hinter dem Kopf
             if (currentConfig.mode === "headBehind") {
                 if (!f('left_shoulder') || !f('right_shoulder') || !f('left_elbow') || !f('right_elbow')) return false;
                 const shoulderDist = Math.abs(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x);
                 const elbowDist = Math.abs(latestKeypoints.left_elbow.x - latestKeypoints.right_elbow.x);
                 if (elbowDist < (shoulderDist * 1.35)) return false; 
             }
-
-            // Regel C: Arme hinter dem Rücken
             if (currentConfig.mode === "backBehind") {
                 if (!f('left_shoulder') || !f('right_shoulder') || !f('left_elbow') || !f('right_elbow')) return false;
                 const avgShoulderY = (latestKeypoints.left_shoulder.y + latestKeypoints.right_shoulder.y) / 2;
-                // Beim Knien/Stehen müssen Ellbogen weit nach unten gezogen sein
                 if (latestKeypoints.left_elbow.y < (avgShoulderY + 45) || latestKeypoints.right_elbow.y < (avgShoulderY + 45)) return false;
             }
-
-            // Symmetrie-Filter (Schulterachse horizontal ausrichten)
             if (currentConfig.symmetry && f('left_shoulder') && f('right_shoulder')) {
                 if (Math.abs(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y) > 22) return false;
             }
@@ -185,46 +149,51 @@
         }
 
         async function startApp() {
-            // Auslesen der dynamischen GUI-Einstellungen
             currentConfig.pos = document.getElementById('positionSelect').value;
             currentConfig.symmetry = document.getElementById('ruleSymmetry').checked;
-            
             if (document.getElementById('ruleBehindHead').checked) currentConfig.mode = "headBehind";
             else if (document.getElementById('ruleBehindBack').checked) currentConfig.mode = "backBehind";
             else currentConfig.mode = "headOver";
 
             document.getElementById('setupScreen').style.display = 'none';
             document.getElementById('activeScreen').style.display = 'block';
-            updateTimerUI(); 
+            updateTimerUI();
+            
             try {
                 status.innerText = "Kamera-Zugriff anfordern...";
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
                 video.srcObject = stream;
+                
                 video.onloadedmetadata = async () => {
                     status.innerText = "Lade stabiles MediaPipe-Modell...";
-                    detector = await poseDetection.createDetector(
-                        poseDetection.SupportedModels.BlazePose, 
-                        { runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404' }
-                    );
+                    detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { 
+                        runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404' 
+                    });
                     
                     status.innerText = "In Position gehen! (5s)"; status.style.color = "#ffaa00"; speak("In Position gehen", true);
                     loop();
                     
-                    setTimeout(() => {
-                        if (f('left_shoulder') && f('right_shoulder') && validatePositionConditions()) { 
-                            initWorkout(); 
-                        } else {
-                            status.innerText = "Bitte korrekte Haltung einnehmen..."; status.style.color = "#ff3333";
-                            let retryAnchor = setInterval(() => { 
-                                if (f('left_shoulder') && f('right_shoulder') && validatePositionConditions()) { 
-                                    initWorkout(); clearInterval(retryAnchor); 
-                                } 
-                            }, 1000);
+                    setTimeout(async () => {
+                        const poses = await detector.estimatePoses(canvas);
+                        if (poses && poses.length > 0) {
+                            poses[0].keypoints.forEach(k => latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score });
+                            
+                            if (f('left_shoulder') && f('right_shoulder') && validatePositionConditions()) {
+                                initWorkout();
+                            } else {
+                                status.innerText = "Bitte korrekte Haltung einnehmen..."; status.style.color = "#ff3333";
+                                let retryAnchor = setInterval(async () => {
+                                    const p = await detector.estimatePoses(canvas);
+                                    if(p && p.length > 0) {
+                                        p[0].keypoints.forEach(k => latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score });
+                                        if (f('left_shoulder') && f('right_shoulder') && validatePositionConditions()) { initWorkout(); clearInterval(retryAnchor); }
+                                    }
+                                }, 1000);
+                            }
                         }
                     }, 5000);
-                    setInterval(checkRules, 1000);
                 };
-            } catch(e) { status.innerText = "Fehler beim Start!"; status.style.color = "red"; console.error(e); }
+            } catch(e) { status.innerText = "Kamerafehler!"; status.style.color = "red"; console.error(e); }
         }
 
         function initWorkout() {
@@ -238,42 +207,41 @@
                     }
                 }
             }, 1000);
+            setInterval(checkRules, 1000); // Fester Scan-Takt für den Wächter
         }
 
         function setNewAnchor(audioMessage) {
             anchorPose = {};
             const activeProfile = DYNAMIC_LIMITS[currentConfig.mode];
             
-            // Verankere nur die Gelenke, die für diesen Modus relevant sind
-            activeProfile.joints.forEach(jointName => {
-                if (f(jointName)) { anchorPose[jointName] = { x: latestKeypoints[jointName].x, y: latestKeypoints[jointName].y }; }
-            });
+            if (f('left_shoulder') && f('right_shoulder')) {
+                baseShoulderWidth = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
+            }
+            activeProfile.joints.forEach(j => { if (f(j)) anchorPose[j] = { x: latestKeypoints[j].x, y: latestKeypoints[j].y }; });
             
-            isPrepared = true; isGracePeriodActive = false; movementDetectedTime = null; errorCounter = 0;
+            isPrepared = true; isGracePeriodActive = false; errorCounter = 0; remainingSecondsCounter = 3;
             status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333";
             if (audioMessage) speak(audioMessage, true);
         }
 
         function loop() {
             canvas.width = 257; canvas.height = 257;
-            const minDim = Math.min(video.videoWidth, video.videoHeight);
+            const minDim = Math.min(video.videoWidth, video.videoHeight || 480);
             ctx.save(); ctx.translate(257, 0); ctx.scale(-1, 1);
             ctx.drawImage(video, (video.videoWidth - minDim) / 2, (video.videoHeight - minDim) / 2, minDim, minDim, 0, 0, 257, 257); ctx.restore();
             requestAnimationFrame(loop);
         }
 
         async function checkRules() {
-            if (!detector || video.readyState < 2) return;
+            if (!detector || video.readyState < 2 || !isPrepared) return;
             const poses = await detector.estimatePoses(canvas);
             
-            // permanent aktiver Anti-Cheat Check über Schultern
+            // Permanent aktiver Anti-Cheat Check
             if (!poses || poses.length === 0) {
-                if (isPrepared) {
-                    errorCounter++;
-                    if (errorCounter >= 2) {
-                        status.innerText = "ANTI-CHEAT: Keine Person erkannt! 🔴"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; speak("Workout abgebrochen", true);
-                        clearInterval(workoutInterval); isPrepared = false;
-                    }
+                errorCounter++;
+                if (errorCounter >= 2) {
+                    status.innerText = "ANTI-CHEAT: Keine Person erkannt! 🔴"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; speak("Workout abgebrochen", true);
+                    clearInterval(workoutInterval); isPrepared = false;
                 }
                 return;
             }
@@ -281,30 +249,14 @@
             latestKeypoints = {};
             poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; });
 
-            // UI Punkte zeichnen
-            const draw = (el, part) => { if (f(part)) { el.style.left = `${(latestKeypoints[part].x / 257) * container.clientWidth}px`; el.style.top = `${(latestKeypoints[part].y / 257) * container.clientHeight}px`; el.style.display = 'block'; } else { el.style.display = 'none'; } };
-            draw(pts.lS, 'left_shoulder'); draw(pts.rS, 'right_shoulder'); 
-            draw(pts.lW, 'left_wrist'); draw(pts.rW, 'right_wrist');
-            draw(pts.lE, 'left_elbow'); draw(pts.rE, 'right_elbow');
-            
-            if (f('left_ear') && f('right_ear')) { pts.head.style.left = `${(((latestKeypoints.left_ear.x + latestKeypoints.right_ear.x)/2) / 257) * container.clientWidth}px`; pts.head.style.top = `${(((latestKeypoints.left_ear.y + latestKeypoints.right_ear.y)/2) / 257) * container.clientHeight}px`; pts.head.style.display = 'block'; } else { pts.head.style.display = 'none'; }
-
-            if (!isPrepared || !anchorPose) return;
-
-            // --- ALLZEIT AKTIVER POSITIONSDRIFT-CHECK ---
             let positionShifted = false;
             const activeProfile = DYNAMIC_LIMITS[currentConfig.mode];
 
-            activeProfile.joints.forEach(jointName => {
-                if (f(jointName) && anchorPose[jointName]) {
-                    const cur = latestKeypoints[jointName];
-                    const anc = anchorPose[jointName];
-                    // Bestimme das Limit basierend auf dem Gelenktyp
-                    let maxDrift = activeProfile.lim.target;
-                    if (jointName.includes('shoulder')) maxDrift = activeProfile.lim.shoulder;
-                    if (jointName.includes('ear') || jointName.includes('hip')) maxDrift = activeProfile.lim.head;
-
-                    if (Math.sqrt(Math.pow(cur.x - anc.x, 2) + Math.pow(cur.y - anc.y, 2)) > maxDrift) { 
+            activeProfile.joints.forEach(j => {
+                if (f(j) && anchorPose[j]) {
+                    let limitFactor = j.includes('shoulder') ? activeProfile.lim.shoulder : (j.includes('ear') || j.includes('hip') ? activeProfile.lim.head : activeProfile.lim.target);
+                    const dynamicPixelLimit = limitFactor * baseShoulderWidth;
+                    if (Math.sqrt(Math.pow(latestKeypoints[j].x - anchorPose[j].x, 2) + Math.pow(latestKeypoints[j].y - anchorPose[j].y, 2)) > dynamicPixelLimit) { 
                         positionShifted = true; 
                     }
                 }
@@ -313,22 +265,25 @@
             if (positionShifted || !validatePositionConditions()) {
                 errorCounter++;
                 if (errorCounter >= 2 || isGracePeriodActive) {
-                    const now = Date.now();
-                    if (!isGracePeriodActive) { isGracePeriodActive = true; movementDetectedTime = now; speak("Korrigiere", true); }
-                    const remainingSeconds = 3 - Math.floor((now - movementDetectedTime) / 1000);
-
-                    if (remainingSeconds > 0) {
-                        status.innerText = `KORREKTURZEIT! Noch ${remainingSeconds}s... ⏳`; status.style.color = "#ffaa00"; timerDisplay.style.color = "#ffaa00"; container.style.borderColor = "#ffaa00"; speak(remainingSeconds.toString());
+                    if (!isGracePeriodActive) { isGracePeriodActive = true; remainingSecondsCounter = 3; speak("Haltung korrigieren", true); }
+                    
+                    if (remainingSecondsCounter > 0) {
+                        status.innerText = `KORREKTURZEIT! Noch ${remainingSecondsCounter}s... ⏳`;
+                        status.style.color = "#ffaa00"; timerDisplay.style.color = "#ffaa00"; container.style.borderColor = "#ffaa00";
+                        speak(remainingSecondsCounter.toString());
+                        remainingSecondsCounter--;
                     } else {
                         if (validatePositionConditions()) { setNewAnchor("Checkpoint"); } 
                         else {
                             timeRemainingSeconds += 10; updateTimerUI(); speak("Strafe plus zehn Sekunden", true);
-                            movementDetectedTime = Date.now(); status.innerText = "HALTUNG FALSCH! +10s! Erneuter Versuch... ⏳"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333";
+                            status.innerText = "HALTUNG FALSCH! +10s! Erneuter Versuch... ⏳";
+                            status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333";
+                            remainingSecondsCounter = 3;
                         }
                     }
                 }
             } else { 
-                errorCounter = 0;
+                errorCounter = 0; isGracePeriodActive = false;
                 status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333"; 
             }
         }
