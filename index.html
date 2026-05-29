@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Pro Wächter (MediaPipe)</title>
+    <title>CornerTime - Pro Wächter (MediaPipe Visualized)</title>
     <style>
         body { 
             background-color: #121212; color: #fff; 
@@ -31,6 +31,14 @@
         .status-message { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; min-height: 2rem; color: #00ffcc; }
         .camera-box { width: 100%; border-radius: 20px; border: 8px solid #333333; overflow: hidden; background: #000; position: relative; aspect-ratio: 1 / 1; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: border-color 0.2s; }
         canvas#processingCanvas { display: block; width: 100%; height: 100%; object-fit: cover; }
+        
+        /* Stylings für die interaktiven Gelenkpunkte */
+        .joint-indicator { position: absolute; width: 22px; height: 22px; border-radius: 50%; pointer-events: none; display: none; z-index: 9999; transform: translate(-50%, -50%); box-shadow: 0 0 8px rgba(0,0,0,0.8); }
+        #ptHead { border: 4px solid #00ffcc; background: rgba(0,255,204,0.3); }
+        #ptLShoulder, #ptRShoulder { border: 4px solid #28a745; background: rgba(40,167,69,0.3); }
+        #ptLWrist, #ptRWrist { border: 4px solid #3399ff; background: rgba(51,153,255,0.3); }
+        #ptLElbow, #ptRElbow { border: 4px solid #ff00ff; background: rgba(255,0,255,0.3); }
+        
         button.start-btn { background: #007aff; color: white; border: none; padding: 16px; font-size: 1.2rem; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 20px; width: 100%; box-shadow: 0 4px 10px rgba(0,122,255,0.3); }
     </style>
     
@@ -66,21 +74,35 @@
             <div class="camera-box" id="camContainer">
                 <video id="webcam" autoplay playsinline muted style="display:none;"></video>
                 <canvas id="processingCanvas"></canvas>
+                
+                <div id="ptHead" class="joint-indicator"></div>
+                <div id="ptLShoulder" class="joint-indicator"></div>
+                <div id="ptRShoulder" class="joint-indicator"></div>
+                <div id="ptLWrist" class="joint-indicator"></div>
+                <div id="ptRWrist" class="joint-indicator"></div>
+                <div id="ptLElbow" class="joint-indicator"></div>
+                <div id="ptRElbow" class="joint-indicator"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // Logische Profile im Hintergrund mit prozentualen Toleranzen (skaliert über Schulberbreite)
         const DYNAMIC_LIMITS = {
             headOver: { joints: ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_wrist', 'right_wrist'], lim: { shoulder: 0.12, head: 0.12, target: 0.16 } },
             headBehind: { joints: ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_elbow', 'right_elbow'], lim: { shoulder: 0.10, head: 0.10, target: 0.13 } },
             backBehind: { joints: ['left_shoulder', 'right_shoulder', 'left_hip', 'right_hip', 'left_elbow', 'right_elbow'], lim: { shoulder: 0.11, head: 0.11, target: 0.15 } }
         };
 
-        // DOM Elemente sauber deklariert
         const video = document.getElementById('webcam'), canvas = document.getElementById('processingCanvas'), ctx = canvas.getContext('2d');
         const container = document.getElementById('camContainer'), status = document.getElementById('status'), timerDisplay = document.getElementById('timerDisplay');
+        
+        // Zuweisung der DOM-Punkte für die Visualisierung
+        const pts = { 
+            head: document.getElementById('ptHead'), 
+            lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), 
+            lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist'), 
+            lE: document.getElementById('ptLElbow'), rE: document.getElementById('ptRElbow') 
+        };
 
         let currentConfig = { pos: "STEHEND", mode: "headOver", symmetry: false };
         let detector = null, anchorPose = {}, isPrepared = false, latestKeypoints = {}, baseShoulderWidth = 100;
@@ -124,7 +146,6 @@
 
         function f(part) { return latestKeypoints[part] && latestKeypoints[part].score > 0.4; }
 
-        // --- BIOLOGISCHE HALTUNGS-VERIFIKATION ---
         function validatePositionConditions() {
             if (currentConfig.mode === "headOver") {
                 if (!f('left_ear') || !f('right_ear') || !f('left_wrist') || !f('right_wrist')) return false;
@@ -207,7 +228,7 @@
                     }
                 }
             }, 1000);
-            setInterval(checkRules, 1000); // Fester Scan-Takt für den Wächter
+            setInterval(checkRules, 1000);
         }
 
         function setNewAnchor(audioMessage) {
@@ -236,7 +257,6 @@
             if (!detector || video.readyState < 2 || !isPrepared) return;
             const poses = await detector.estimatePoses(canvas);
             
-            // Permanent aktiver Anti-Cheat Check
             if (!poses || poses.length === 0) {
                 errorCounter++;
                 if (errorCounter >= 2) {
@@ -249,6 +269,37 @@
             latestKeypoints = {};
             poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; });
 
+            // --- DIE NEUE VISUALISIERUNGS-LOGIK (PROXIMAL GESTEUERT) ---
+            const drawPoint = (el, part) => { 
+                if (f(part)) { 
+                    el.style.left = `${(latestKeypoints[part].x / 257) * container.clientWidth}px`; 
+                    el.style.top = `${(latestKeypoints[part].y / 257) * container.clientHeight}px`; 
+                    el.style.display = 'block'; 
+                } else { el.style.display = 'none'; } 
+            };
+
+            // Schultern zeichnen wir immer (Basis-Anker)
+            drawPoint(pts.lS, 'left_shoulder'); 
+            drawPoint(pts.rS, 'right_shoulder'); 
+
+            // Je nach Modus blenden wir dynamisch nur die relevanten Gelenke ein
+            if (currentConfig.mode === "headOver") {
+                drawPoint(pts.lW, 'left_wrist'); drawPoint(pts.rW, 'right_wrist');
+                pts.lE.style.display = 'none'; pts.rE.style.display = 'none';
+            } else {
+                // Bei "Hände hinter Kopf" und "hinter Rücken" tracken wir primär die Ellbogen
+                drawPoint(pts.lE, 'left_elbow'); drawPoint(pts.rE, 'right_elbow');
+                pts.lW.style.display = 'none'; pts.rW.style.display = 'none';
+            }
+            
+            // Kopfmitte (Ohren-Mittelwert) berechnen und anzeigen
+            if (f('left_ear') && f('right_ear')) { 
+                pts.head.style.left = `${(((latestKeypoints.left_ear.x + latestKeypoints.right_ear.x)/2) / 257) * container.clientWidth}px`; 
+                pts.head.style.top = `${(((latestKeypoints.left_ear.y + latestKeypoints.right_ear.y)/2) / 257) * container.clientHeight}px`; 
+                pts.head.style.display = 'block'; 
+            } else { pts.head.style.display = 'none'; }
+
+            // --- ALLZEIT AKTIVER POSITIONSDRIFT-CHECK ---
             let positionShifted = false;
             const activeProfile = DYNAMIC_LIMITS[currentConfig.mode];
 
