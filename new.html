@@ -66,6 +66,7 @@
             <select id="legSelect" class="custom-select">
                 <option value="ZUSAMMEN">Beine zusammen</option>
                 <option value="GESPREIZT">Beine gespreizt</option>
+                <option value="IGNORIEREN">Nicht sichtbar / Ignorieren</option>
             </select>
             
             <button class="start-btn" onclick="startApp()">ÜBERWACHUNG STARTEN</button>
@@ -140,36 +141,57 @@
             const headY = (f('left_ear') && f('right_ear')) ? (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2 : (latestKeypoints.left_eye && latestKeypoints.right_eye ? (latestKeypoints.left_eye.y + latestKeypoints.right_eye.y)/2 : 0);
             const shoulderY = (latestKeypoints.left_shoulder.y + latestKeypoints.right_shoulder.y) / 2;
             
-            // 1. Position-Check (Unterkörper)
-            if (selPos !== "KNIEND_VORGEBEUGT") {
-                if (!f('left_hip') || !f('right_hip') || !f('left_heel') || !f('right_heel')) return false;
-                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
-                const heelY = (latestKeypoints.left_heel.y + latestKeypoints.right_heel.y) / 2;
-                const vertHipHeel = heelY - hipY;
-
-                if (selPos === "STEHEND" && vertHipHeel <= 2.0 * sb) return false;
-                if (selPos === "KNIEND_AUFRECHT" && (vertHipHeel < 1.1 * sb || vertHipHeel > 1.8 * sb)) return false;
-                if (selPos === "KNIEND_SITZEND" && vertHipHeel >= 0.7 * sb) return false;
-            } else {
-                // Vorgebeugt: Kopf/Schulter tiefer als Hüfte oder unsichtbar
-                if (f('left_hip') && f('right_hip')) {
+                        // 1. Position-Check (Unterkörper)
+            if (selLeg !== "IGNORIEREN") {
+                // STANDARD-MODUS: Voller Unterkörper-Check (Hüfte und Fersen müssen im Bild sein)
+                if (selPos !== "KNIEND_VORGEBEUGT") {
+                    if (!f('left_hip') || !f('right_hip') || !f('left_heel') || !f('right_heel')) return false;
                     const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
-                    if (f('left_shoulder') && shoulderY < hipY) return false;
+                    const heelY = (latestKeypoints.left_heel.y + latestKeypoints.right_heel.y) / 2;
+                    const vertHipHeel = heelY - hipY;
+
+                    if (selPos === "STEHEND" && vertHipHeel <= 2.0 * sb) return false;
+                    if (selPos === "KNIEND_AUFRECHT" && (vertHipHeel < 1.1 * sb || vertHipHeel > 1.8 * sb)) return false;
+                    if (selPos === "KNIEND_SITZEND" && vertHipHeel >= 0.7 * sb) return false;
+                } else {
+                    // Vorgebeugt (mit Hüftsicht): Kopf/Schulter tiefer als Hüfte
+                    if (f('left_hip') && f('right_hip')) {
+                        const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
+                        if (f('left_shoulder') && shoulderY < hipY) return false;
+                    }
+                }
+            } else {
+                // REINER OBERKÖRPER-MODUS (Hüfte und Beine sind komplett abgeschnitten)
+                if (selPos === "KNIEND_VORGEBEUGT") {
+                    // Wenn du dich nach vorne beugst und das Bild eng ist, wandert der Kopf 
+                    // extrem nah an die Schulterhöhe heran oder darunter.
+                    if (headY !== 0 && (shoulderY - headY) > 0.4 * sb) return false; 
+                } else {
+                    // Für Stehend / Kniend aufrecht / Kniend sitzend:
+                    // Wir prüfen nur, ob der Kopf logisch und aufrecht über den Schultern steht.
+                    if (headY === 0 || headY > shoulderY) return false;
+                    // Der Kopf muss einen natürlichen Mindestabstand zu den Schultern haben
+                    if ((shoulderY - headY) < 0.3 * sb) return false;
                 }
             }
 
-            // 2. Beinhaltung-Check
-            let legDistance = 0, hasLegPoints = false;
-            if (f('left_knee') && f('right_knee')) {
-                legDistance = Math.abs(latestKeypoints.left_knee.x - latestKeypoints.right_knee.x); hasLegPoints = true;
-            } else if (f('left_foot_index') && f('right_foot_index')) {
-                legDistance = Math.abs(latestKeypoints.left_foot_index.x - latestKeypoints.right_foot_index.x); hasLegPoints = true;
-            }
-            if (hasLegPoints) {
-                if (selLeg === "ZUSAMMEN" && legDistance > 0.85 * sb) return false;
-                if (selLeg === "GESPREIZT" && legDistance < 1.25 * sb) return false;
-            }
 
+            // 2. Beinhaltung-Check (nur wenn nicht auf IGNORIEREN gestellt)
+            if (selLeg !== "IGNORIEREN") {
+                let legDistance = 0, hasLegPoints = false;
+                if (f('left_knee') && f('right_knee')) {
+                    legDistance = Math.abs(latestKeypoints.left_knee.x - latestKeypoints.right_knee.x); hasLegPoints = true;
+                } else if (f('left_foot_index') && f('right_foot_index')) {
+                    legDistance = Math.abs(latestKeypoints.left_foot_index.x - latestKeypoints.right_foot_index.x); hasLegPoints = true;
+                }
+                if (hasLegPoints) {
+                    if (selLeg === "ZUSAMMEN" && legDistance > 0.85 * sb) return false;
+                    if (selLeg === "GESPREIZT" && legDistance < 1.25 * sb) return false;
+                } else {
+                    // Wenn Punkte gefordert, aber nicht sichtbar sind -> Fehler
+                    return false; 
+                }
+            }
             // 3. Armhaltung-Check
             if (selArm === "UEBER_KOPF") {
                 if (!f('left_wrist') || !f('right_wrist') || headY === 0) return false;
