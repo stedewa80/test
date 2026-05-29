@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CornerTime - Pro Wächter (Ganzkörper-Spiegel)</title>
+    <style>
+        body { 
+            background-color: #121212; color: #fff; 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            display: flex; flex-direction: column; align-items: center; 
+            justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; 
+        }
+        .app-container { width: 100%; max-width: 400px; text-align: center; }
+        .setup-screen { background: #1e1e1e; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: left; }
+        h2 { text-align: center; color: #00ffcc; margin-top: 0; margin-bottom: 20px; }
+        h3 { font-size: 0.9rem; color: #aaa; text-transform: uppercase; margin-top: 20px; letter-spacing: 1px; }
+        .custom-select { width: 100%; background: #2a2a2a; color: #fff; border: 2px solid #007aff; padding: 12px; border-radius: 10px; font-size: 1rem; font-weight: bold; cursor: pointer; outline: none; margin-bottom: 10px; }
+        
+        .timer-display { font-size: 3.5rem; font-weight: 800; margin-bottom: 5px; font-variant-numeric: tabular-nums; transition: color 0.3s; }
+        #activeScreen { display: none; width: 100%; }
+        .status-message { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; min-height: 2rem; color: #00ffcc; }
+        .camera-box { width: 100%; border-radius: 20px; border: 8px solid #333333; overflow: hidden; background: #000; position: relative; aspect-ratio: 1 / 1; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        canvas#processingCanvas { display: block; width: 100%; height: 100%; object-fit: cover; }
+        
+        .joint-indicator { position: absolute; width: 22px; height: 22px; border-radius: 50%; pointer-events: none; display: none; z-index: 9999; transform: translate(-50%, -50%); box-shadow: 0 0 8px rgba(0,0,0,0.8); }
+        #ptHead { border: 4px solid #00ffcc; background: rgba(0,255,204,0.3); }
+        #ptLShoulder, #ptRShoulder { border: 4px solid #28a745; background: rgba(40,167,69,0.3); }
+        #ptLWrist, #ptRWrist { border: 4px solid #3399ff; background: rgba(51,153,255,0.3); }
+        #ptLElbow, #ptRElbow { border: 4px solid #ff00ff; background: rgba(255,0,255,0.3); }
+        #ptLHip, #ptRHip { border: 4px solid #ffaa00; background: rgba(255,170,0,0.3); }
+        
+        button.start-btn { background: #007aff; color: white; border: none; padding: 16px; font-size: 1.2rem; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 20px; width: 100%; box-shadow: 0 4px 10px rgba(0,122,255,0.3); }
+    </style>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.20.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.20.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3"></script>
+</head>
+<body>
+    <div class="app-container">
+        <div id="setupScreen" class="setup-screen">
+            <h2>Wächter Pro</h2>
+            
+            <h3>Position</h3>
+            <select id="positionSelect" class="custom-select" onchange="adjustFormElements()">
+                <option value="STEHEND">Stehend</option>
+                <option value="KNIEND_AUFRECHT">Kniend - aufrecht</option>
+                <option value="KNIEND_SITZEND">Kniend - auf Fersen sitzend</option>
+                <option value="KNIEND_VORGEBEUGT">Kniend - nach vorne gebeugt</option>
+            </select>
+            
+            <h3>Armhaltung</h3>
+            <select id="armSelect" class="custom-select">
+                <option value="UEBER_KOPF">Gerade über dem Kopf</option>
+                <option value="AUF_KOPF">Auf dem Kopf (Hände auf Scheitel)</option>
+                <option value="HINTER_KOPF">Hinter dem Kopf (Verschränkt)</option>
+                <option value="DREIZACK">Seitlich neben dem Kopf (Dreizack)</option>
+                <option value="RUECKEN_ELLBOGEN">Hinter dem Rücken (greifen Ellbogen)</option>
+                <option value="RUECKEN_PO">Hinter dem Rücken (ruhen auf Po)</option>
+                <option value="KEINE">Keine Regel / Verdeckt</option>
+            </select>
+            
+            <h3>Beinhaltung</h3>
+            <select id="legSelect" class="custom-select">
+                <option value="ZUSAMMEN">Beine zusammen</option>
+                <option value="GESPREIZT">Beine gespreizt</option>
+            </select>
+            
+            <button class="start-btn" onclick="startApp()">ÜBERWACHUNG STARTEN</button>
+        </div>
+        
+        <div id="activeScreen">
+            <div id="timerDisplay" class="timer-display">05:00</div>
+            <div id="status" class="status-message">Kamera initialisieren...</div>
+            <div class="camera-box" id="camContainer">
+                <video id="webcam" autoplay playsinline muted style="display:none;"></video>
+                <canvas id="processingCanvas"></canvas>
+                
+                <div id="ptHead" class="joint-indicator"></div>
+                <div id="ptLShoulder" class="joint-indicator"></div>
+                <div id="ptRShoulder" class="joint-indicator"></div>
+                <div id="ptLWrist" class="joint-indicator"></div>
+                <div id="ptRWrist" class="joint-indicator"></div>
+                <div id="ptLElbow" class="joint-indicator"></div>
+                <div id="ptRElbow" class="joint-indicator"></div>
+                <div id="ptLHip" class="joint-indicator"></div>
+                <div id="ptRHip" class="joint-indicator"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcam'), canvas = document.getElementById('processingCanvas'), ctx = canvas.getContext('2d');
+        const container = document.getElementById('camContainer'), status = document.getElementById('status'), timerDisplay = document.getElementById('timerDisplay');
+        
+        const pts = { 
+            head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), 
+            lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist'), lE: document.getElementById('ptLElbow'), 
+            rE: document.getElementById('ptRElbow'), lH: document.getElementById('ptLHip'), rH: document.getElementById('ptRHip')
+        };
+
+        let selPos = "", selArm = "", selLeg = "";
+        let detector = null, anchorPose = {}, isPrepared = false, latestKeypoints = {}, baseShoulderWidth = 100, wakeLock = null;
+        let timeRemainingSeconds = 300, workoutInterval = null, isGracePeriodActive = false, errorCounter = 0, remainingSecondsCounter = 3;
+
+        function adjustFormElements() {
+            const pos = document.getElementById('positionSelect').value;
+            const armSel = document.getElementById('armSelect');
+            if (pos === "KNIEND_VORGEBEUGT") {
+                armSel.value = "KEINE";
+            } else if (armSel.value === "KEINE") {
+                armSel.value = "UEBER_KOPF";
+            }
+        }
+
+        function speak(text, force = false) {
+            try {
+                if (force) { window.speechSynthesis.cancel(); }
+                const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'de-DE'; utterance.rate = 1.1;
+                window.speechSynthesis.speak(utterance);
+            } catch (e) { console.log("Audiofehler:", e); }
+        }
+
+        function updateTimerUI() {
+            if (timeRemainingSeconds < 0) timeRemainingSeconds = 0;
+            const mins = Math.floor(timeRemainingSeconds / 60).toString().padStart(2, '0');
+            const secs = (timeRemainingSeconds % 60).toString().padStart(2, '0');
+            timerDisplay.innerText = `${mins}:${secs}`;
+        }
+
+        function f(part) { return latestKeypoints[part] && latestKeypoints[part].score > 0.4; }
+
+        // --- EXAKTE BIOMECHANISCHE VALIDIERUNG (START & CORRECTION-RESET) ---
+        function validateHaltung() {
+            if (!f('left_shoulder') || !f('right_shoulder')) return false;
+            
+            const sb = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
+            const headY = (f('left_ear') && f('right_ear')) ? (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2 : (latestKeypoints.left_eye && latestKeypoints.right_eye ? (latestKeypoints.left_eye.y + latestKeypoints.right_eye.y)/2 : 0);
+            const shoulderY = (latestKeypoints.left_shoulder.y + latestKeypoints.right_shoulder.y) / 2;
+            
+            // 1. Position-Check (Unterkörper)
+            if (selPos !== "KNIEND_VORGEBEUGT") {
+                if (!f('left_hip') || !f('right_hip') || !f('left_heel') || !f('right_heel')) return false;
+                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
+                const heelY = (latestKeypoints.left_heel.y + latestKeypoints.right_heel.y) / 2;
+                const vertHipHeel = heelY - hipY;
+
+                if (selPos === "STEHEND" && vertHipHeel <= 2.0 * sb) return false;
+                if (selPos === "KNIEND_AUFRECHT" && (vertHipHeel < 1.1 * sb || vertHipHeel > 1.8 * sb)) return false;
+                if (selPos === "KNIEND_SITZEND" && vertHipHeel >= 0.7 * sb) return false;
+            } else {
+                // Vorgebeugt: Kopf/Schulter tiefer als Hüfte oder unsichtbar
+                if (f('left_hip') && f('right_hip')) {
+                    const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
+                    if (f('left_shoulder') && shoulderY < hipY) return false;
+                }
+            }
+
+            // 2. Beinhaltung-Check
+            let legDistance = 0, hasLegPoints = false;
+            if (f('left_knee') && f('right_knee')) {
+                legDistance = Math.abs(latestKeypoints.left_knee.x - latestKeypoints.right_knee.x); hasLegPoints = true;
+            } else if (f('left_foot_index') && f('right_foot_index')) {
+                legDistance = Math.abs(latestKeypoints.left_foot_index.x - latestKeypoints.right_foot_index.x); hasLegPoints = true;
+            }
+            if (hasLegPoints) {
+                if (selLeg === "ZUSAMMEN" && legDistance > 0.85 * sb) return false;
+                if (selLeg === "GESPREIZT" && legDistance < 1.25 * sb) return false;
+            }
+
+            // 3. Armhaltung-Check
+            if (selArm === "UEBER_KOPF") {
+                if (!f('left_wrist') || !f('right_wrist') || headY === 0) return false;
+                if (latestKeypoints.left_wrist.y > headY || latestKeypoints.right_wrist.y > headY) return false;
+            }
+            if (selArm === "AUF_KOPF") {
+                if (!f('left_wrist') || !f('right_wrist') || !f('left_elbow') || !f('right_elbow')) return false;
+                if (Math.abs(latestKeypoints.left_wrist.y - headY) > 0.3 * sb || Math.abs(latestKeypoints.right_wrist.y - headY) > 0.3 * sb) return false;
+                if (Math.abs(latestKeypoints.left_elbow.x - latestKeypoints.right_elbow.x) < 1.35 * sb) return false;
+            }
+            if (selArm === "HINTER_KOPF") {
+                if (!f('left_elbow') || !f('right_elbow')) return false;
+                if (Math.abs(latestKeypoints.left_elbow.x - latestKeypoints.right_elbow.x) < 1.45 * sb) return false;
+            }
+            if (selArm === "DREIZACK") {
+                if (!f('left_elbow') || !f('right_elbow') || !f('left_wrist') || !f('right_wrist')) return false;
+                if (Math.abs(latestKeypoints.left_elbow.y - shoulderY) > 0.3 * sb || Math.abs(latestKeypoints.right_elbow.y - shoulderY) > 0.3 * sb) return false;
+                if (latestKeypoints.left_wrist.y > latestKeypoints.left_elbow.y || latestKeypoints.right_wrist.y > latestKeypoints.right_elbow.y) return false;
+            }
+            if (selArm === "RUECKEN_ELLBOGEN") {
+                if (!f('left_elbow') || !f('right_elbow')) return false;
+                if (Math.abs(latestKeypoints.left_elbow.x - latestKeypoints.right_elbow.x) > 0.95 * sb) return false;
+            }
+            if (selArm === "RUECKEN_PO") {
+                if (!f('left_wrist') || !f('right_wrist') || !f('left_hip') || !f('right_hip')) return false;
+                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
+                if (Math.abs(latestKeypoints.left_wrist.y - hipY) > 0.4 * sb || Math.abs(latestKeypoints.right_wrist.y - hipY) > 0.4 * sb) return false;
+            }
+
+            return true;
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock !== null) { wakeLock.release().then(() => { wakeLock = null; }); }
+        }
+
+        async function startApp() {
+            selPos = document.getElementById('positionSelect').value;
+            selArm = document.getElementById('armSelect').value;
+            selLeg = document.getElementById('legSelect').value;
+
+            document.getElementById('setupScreen').style.display = 'none';
+            document.getElementById('activeScreen').style.display = 'block';
+            updateTimerUI();
+            
+            try {
+                status.innerText = "Kamera-Zugriff anfordern...";
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = async () => {
+                    try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { console.log("WakeLock Fehler:", err); }
+
+                    status.innerText = "Lade stabiles MediaPipe-Modell...";
+                    detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { 
+                        runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404' 
+                    });
+                    
+                    status.innerText = "In Position gehen! (5s)"; status.style.color = "#ffaa00"; speak("In Position gehen", true);
+                    loop();
+                    
+                    setTimeout(async () => {
+                        const poses = await detector.estimatePoses(canvas);
+                        if (poses && poses.length > 0) {
+                            poses[0].keypoints.forEach(k => latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score });
+                            if (validateHaltung()) { initWorkout(); } 
+                            else {
+                                status.innerText = "Bitte korrekte Haltung einnehmen..."; status.style.color = "#ff3333";
+                                let retryAnchor = setInterval(async () => {
+                                    const p = await detector.estimatePoses(canvas);
+                                    if(p && p.length > 0) {
+                                        p[0].keypoints.forEach(k => latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score });
+                                        if (validateHaltung()) { initWorkout(); clearInterval(retryAnchor); }
+                                    }
+                                }, 1000);
+                            }
+                        }
+                    }, 5000);
+                };
+            } catch(e) { status.innerText = "Kamerafehler!"; status.style.color = "red"; console.error(e); }
+        }
+
+        function initWorkout() {
+            setNewAnchor("Wächter aktiv");
+            workoutInterval = setInterval(() => {
+                if (isPrepared && !isGracePeriodActive) {
+                    timeRemainingSeconds--; updateTimerUI();
+                    if (timeRemainingSeconds <= 0) {
+                        clearInterval(workoutInterval); isPrepared = false;
+                        status.innerText = "TRAINING BEENDET! 🎉"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#00ffcc"; 
+                        speak("Training beendet. Ausgezeichnet.", true); releaseWakeLock();
+                    }
+                }
+            }, 1000);
+            setInterval(checkRules, 1000);
+        }
+
+        function setNewAnchor(audioMessage) {
+            anchorPose = {};
+            if (f('left_shoulder') && f('right_shoulder')) {
+                baseShoulderWidth = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
+            }
+            
+            // Relevante Gelenke für das Ganzkörper-Drift-Matching einfrieren
+            const trackingList = ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_hip', 'right_hip', 'left_knee', 'right_knee', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist', 'left_heel', 'right_heel'];
+            trackingList.forEach(j => { if (f(j)) anchorPose[j] = { x: latestKeypoints[j].x, y: latestKeypoints[j].y }; });
+            
+            isPrepared = true; isGracePeriodActive = false; errorCounter = 0; remainingSecondsCounter = 3;
+            status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333";
+            if (audioMessage) speak(audioMessage, true);
+        }
+
+        function loop() {
+            canvas.width = 257; canvas.height = 257;
+            const minDim = Math.min(video.videoWidth, video.videoHeight || 480);
+            ctx.save(); ctx.translate(257, 0); ctx.scale(-1, 1);
+            ctx.drawImage(video, (video.videoWidth - minDim) / 2, (video.videoHeight - minDim) / 2, minDim, minDim, 0, 0, 257, 257); ctx.restore();
+            requestAnimationFrame(loop);
+        }
+
+        async function checkRules() {
+            if (!detector || video.readyState < 2 || !isPrepared) return;
+            const poses = await detector.estimatePoses(canvas);
+            
+            if (!poses || poses.length === 0) {
+                errorCounter++;
+                if (errorCounter >= 2) {
+                    status.innerText = "ANTI-CHEAT: Keine Person erkannt! 🔴"; status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; speak("Workout abgebrochen", true);
+                    clearInterval(workoutInterval); isPrepared = false; releaseWakeLock();
+                }
+                return;
+            }
+
+            latestKeypoints = {};
+            poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; });
+
+            // --- DEZENTE LIVE-VISUALISIERUNG DER FIXPUNKTE ---
+            const drawPoint = (el, part) => { 
+                if (f(part)) { 
+                    el.style.left = `${(latestKeypoints[part].x / 257) * container.clientWidth}px`; el.style.top = `${(latestKeypoints[part].y / 257) * container.clientHeight}px`; el.style.display = 'block'; 
+                } else { el.style.display = 'none'; } 
+            };
+            drawPoint(pts.lS, 'left_shoulder'); drawPoint(pts.rS, 'right_shoulder');
+            if (selArm.includes("UEBER_KOPF") || selArm.includes("DREIZACK")) { drawPoint(pts.lW, 'left_wrist'); drawPoint(pts.rW, 'right_wrist'); pts.lE.style.display = 'none'; pts.rE.style.display = 'none'; }
+            else if (selArm.includes("KOPF") || selArm.includes("RUECKEN")) { drawPoint(pts.lE, 'left_elbow'); drawPoint(pts.rE, 'right_elbow'); pts.lW.style.display = 'none'; pts.rW.style.display = 'none'; }
+            else { pts.lW.style.display = 'none'; pts.rW.style.display = 'none'; pts.lE.style.display = 'none'; pts.rE.style.display = 'none'; }
+            if (f('left_hip') && f('right_hip')) { drawPoint(pts.lH, 'left_hip'); drawPoint(pts.rH, 'right_hip'); }
+            if (f('left_ear') && f('right_ear')) { pts.head.style.left = `${(((latestKeypoints.left_ear.x + latestKeypoints.right_ear.x)/2) / 257) * container.clientWidth}px`; pts.head.style.top = `${(((latestKeypoints.left_ear.y + latestKeypoints.right_ear.y)/2) / 257) * container.clientHeight}px`; pts.head.style.display = 'block'; } else { pts.head.style.display = 'none'; }
+
+            // --- UNIVERSAL GANZKÖRPER-DRIFT-CHECK ---
+            let globalDriftDetected = false;
+            const allowedDeviation = 0.14 * baseShoulderWidth; // 14% der Schulterbreite Toleranz
+
+            for (const joint in anchorPose) {
+                if (f(joint)) {
+                    const dist = Math.sqrt(Math.pow(latestKeypoints[joint].x - anchorPose[joint].x, 2) + Math.pow(latestKeypoints[joint].y - anchorPose[joint].y, 2));
+                    if (dist > allowedDeviation) { globalDriftDetected = true; break; }
+                }
+            }
+
+            if (globalDriftDetected) {
+                errorCounter++;
+                if (errorCounter >= 2 || isGracePeriodActive) {
+                    if (!isGracePeriodActive) { isGracePeriodActive = true; remainingSecondsCounter = 3; speak("Haltung korrigieren", true); }
+                    
+                    if (remainingSecondsCounter > 0) {
+                        status.innerText = `KORREKTURZEIT! Noch ${remainingSecondsCounter}s... ⏳`;
+                        status.style.color = "#ffaa00"; timerDisplay.style.color = "#ffaa00"; container.style.borderColor = "#ffaa00";
+                        speak(remainingSecondsCounter.toString()); remainingSecondsCounter--;
+                    } else {
+                        // Nach Ablauf der 3s entscheidet die harte Biomechanik-Prüfung über Checkpoint vs Strafe!
+                        if (validateHaltung()) { 
+                            setNewAnchor("Checkpoint"); 
+                        } else {
+                            timeRemainingSeconds += 10; updateTimerUI(); speak("Strafe plus zehn Sekunden", true);
+                            status.innerText = "HALTUNG FALSCH! +10s! Erneuter Versuch... ⏳";
+                            status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; remainingSecondsCounter = 3;
+                        }
+                    }
+                }
+            } else { 
+                errorCounter = 0; isGracePeriodActive = false;
+                status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333"; 
+            }
+        }
+    </script>
+</body>
+</html>
