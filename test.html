@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Unbestechlicher Wächter Pro (REPAIRED)</title>
+    <title>CornerTime - Unbestechlicher Wächter Pro (V2)</title>
     <style>
         body { 
             background-color: #121212; color: #fff; 
@@ -52,6 +52,7 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- SCREEN 1: CONFIGURATION -->
         <div id="setupScreen" class="setup-screen">
             <h2>Wächter Pro Setup</h2>
             
@@ -98,6 +99,7 @@
             <button class="secondary-btn" onclick="showVerificationOption()">Logfile verifizieren (Buddy-Modus)</button>
         </div>
         
+        <!-- SCREEN 2: ACTIVE WORKOUT -->
         <div id="activeScreen">
             <div id="timerDisplay" class="timer-display">00:00</div>
             <div id="status" class="status-message">Kamera initialisieren...</div>
@@ -121,6 +123,7 @@
             </div>
         </div>
 
+        <!-- SCREEN 3: UNBESTECHLICHES LOGFILE -->
         <div id="logScreen" class="log-screen">
             <h2 id="logTitle">Workout Protokoll</h2>
             <div id="verifyBadge" class="verification-badge" style="display:none;"></div>
@@ -142,6 +145,16 @@
             lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist'), lE: document.getElementById('ptLElbow'), 
             rE: document.getElementById('ptRElbow'), lH: document.getElementById('ptLHip'), rH: document.getElementById('ptRHip'),
             lK: document.getElementById('ptLKnee'), rK: document.getElementById('ptRKnee'), lF: document.getElementById('ptLHeel'), rF: document.getElementById('ptRHeel')
+        };
+
+        const punktNamenDe = {
+            'left_ear': 'Kopf', 'right_ear': 'Kopf',
+            'left_shoulder': 'Linke Schulter', 'right_shoulder': 'Rechte Schulter',
+            'left_elbow': 'Linker Ellbogen', 'right_elbow': 'Rechter Ellbogen',
+            'left_wrist': 'Linkes Handgelenk', 'right_wrist': 'Rechtes Handgelenk',
+            'left_hip': 'Linke Hüfte', 'right_hip': 'Rechte Hüfte',
+            'left_knee': 'Linkes Knie', 'right_knee': 'Rechte Knie',
+            'left_heel': 'Linke Ferse', 'right_heel': 'Rechte Ferse'
         };
 
         let selPos = "", selArm = "", selLeg = "";
@@ -193,7 +206,7 @@
         function validateHaltung() {
             if (!f('left_shoulder') || !f('right_shoulder')) return { valid: false, msg: "Körper nicht im Bild" };
             
-            const sb = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
+            const sb = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.right_shoulder.y - latestKeypoints.right_shoulder.y, 2));
             const headY = (f('left_ear') && f('right_ear')) ? (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2 : (latestKeypoints.left_eye && latestKeypoints.right_eye ? (latestKeypoints.left_eye.y + latestKeypoints.right_eye.y)/2 : 0);
             const shoulderY = (latestKeypoints.left_shoulder.y + latestKeypoints.right_shoulder.y) / 2;
             
@@ -264,8 +277,8 @@
             }
             if (selArm === "RUECKEN_PO") {
                 if (!f('left_wrist') || !f('right_wrist') || !f('left_hip') || !f('right_hip')) return { valid: false, msg: "Hände hinten tief" };
-                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
-                if (Math.abs(latestKeypoints.left_wrist.y - hipY) > 0.4 * sb || Math.abs(latestKeypoints.right_wrist.y - hipY) > 0.4 * sb) return { valid: false, msg: "Hände flach auf Gesäß legen" };
+                const hipY = (latestKeypoints.left_wrist.y - (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2);
+                if (Math.abs(latestKeypoints.left_wrist.y - ((latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2)) > 0.4 * sb || Math.abs(latestKeypoints.right_wrist.y - ((latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2)) > 0.4 * sb) return { valid: false, msg: "Hände flach auf Gesäß legen" };
             }
 
             return { valid: true, msg: "Überwachung aktiv! 🟢" };
@@ -281,10 +294,6 @@
             minP = parseInt(document.getElementById('minPenalty').value);
             maxP = parseInt(document.getElementById('maxPenalty').value);
             salt = document.getElementById('secretSalt').value;
-
-            timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD;
-            initialTargetDuration = timeRemainingSeconds;
-            startTimeStr = new Date().toLocaleString('de-DE');
 
             document.getElementById('setupScreen').style.display = 'none';
             document.getElementById('activeScreen').style.display = 'block';
@@ -322,7 +331,14 @@
         }
 
         function initWorkout() {
+            // FIX: Startzeitpunkt ERST JETZT nach Ablauf des Countdowns stempeln
+            startTimeStr = new Date().toLocaleString('de-DE');
+            timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD;
+            initialTargetDuration = timeRemainingSeconds;
+            updateTimerUI();
+
             setNewAnchor("Wächter aktiv");
+            
             workoutInterval = setInterval(() => {
                 if (isPrepared && !appEnded) {
                     totalTimeElapsed++;
@@ -340,7 +356,7 @@
         function setNewAnchor(audioMessage) {
             anchorPose = {};
             if (f('left_shoulder') && f('right_shoulder')) {
-                baseShoulderWidth = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
+                baseShoulderWidth = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.right_shoulder.y - latestKeypoints.right_shoulder.y, 2));
             }
             const trackingList = ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_hip', 'right_hip', 'left_knee', 'right_knee', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist', 'left_heel', 'right_heel'];
             trackingList.forEach(j => { if (f(j)) anchorPose[j] = { x: latestKeypoints[j].x, y: latestKeypoints[j].y }; });
@@ -357,7 +373,6 @@
             ctx.save(); ctx.translate(257, 0); ctx.scale(-1, 1);
             ctx.drawImage(video, (video.videoWidth - minDim) / 2, (video.videoHeight - minDim) / 2, minDim, minDim, 0, 0, 257, 257); ctx.restore();
             
-            // HOCHFREQUENTES TRACKING DIREKT IM FRAME-LOOP FÜR PUNKTANZEIGE AB SEKUNDE 1
             if (detector && video.readyState >= 2) {
                 const poses = await detector.estimatePoses(canvas);
                 if (poses && poses.length > 0) {
@@ -384,7 +399,6 @@
         async function checkRules() {
             if (!detector || !isPrepared || appEnded) return;
             
-            // Wenn das Korrekturfenster aktiv ist, übernimmt der Countdown die Kontrolle (keine Drift-Prüfung!)
             if (isGracePeriodActive) {
                 if (remainingSecondsCounter > 0) {
                     status.innerText = `KORREKTURZEIT! Noch ${remainingSecondsCounter}s... ⏳`;
@@ -397,12 +411,13 @@
                         logEvents.push(`[${timeStamp}] CHECKPOINT: Position erfolgreich wiederhergestellt.`);
                         setNewAnchor("Checkpoint"); 
                     } else {
+                        // --- DETAIL-CHECK NACH 3 SEKUNDEN ---
                         let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
                         timeRemainingSeconds += penalty; totalPenaltiesCount++; totalPenaltySecondsSum += penalty;
                         updateTimerUI();
                         
                         const timeStamp = new Date().toLocaleTimeString('de-DE');
-                        logEvents.push(`[${timeStamp}] ESKALATION: Haltung nach 3s immer noch falsch! -> FOLGE-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
+                        logEvents.push(`[${timeStamp}] ESKALATION: Haltung falsch (${check.msg}) -> FOLGE-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
                         
                         speak(`${check.msg}. Strafe plus ${penalty} Sekunden`, true);
                         status.innerText = `${check.msg.toUpperCase()}! +${penalty}s! ⏳`;
@@ -412,18 +427,22 @@
                 return;
             }
 
+            let brokenJoint = "";
             let globalDriftDetected = false;
             const allowedDeviation = 0.14 * baseShoulderWidth;
 
             for (const joint in anchorPose) {
                 if (f(joint)) {
                     const dist = Math.sqrt(Math.pow(latestKeypoints[joint].x - anchorPose[joint].x, 2) + Math.pow(latestKeypoints[joint].y - anchorPose[joint].y, 2));
-                    if (dist > allowedDeviation) { globalDriftDetected = true; break; }
+                    if (dist > allowedDeviation) { 
+                        globalDriftDetected = true; 
+                        brokenJoint = punktNamenDe[joint] || joint; // Namen des betroffenen Gelenks merken
+                        break; 
+                    }
                 }
             }
 
             if (globalDriftDetected) {
-                let check = validateHaltung();
                 isGracePeriodActive = true; 
                 remainingSecondsCounter = 3; 
                 
@@ -432,9 +451,9 @@
                 updateTimerUI();
                 
                 const timeStamp = new Date().toLocaleTimeString('de-DE');
-                logEvents.push(`[${timeStamp}] DRIFT: ${check.msg} -> SOFORT-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
+                logEvents.push(`[${timeStamp}] DRIFT: Bewegung erkannt bei [${brokenJoint}] -> SOFORT-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
                 
-                speak(`Bewegung erkannt. Plus ${penalty} Sekunden. Haltung korrigieren.`, true); 
+                speak(`Bewegung erkannt. ${brokenJoint}. Plus ${penalty} Sekunden. Haltung korrigieren.`, true); 
             }
         }
 
@@ -446,13 +465,16 @@
             const endTimeStr = new Date().toLocaleString('de-DE');
             let statusText = endReason === "SUCCESS" ? "Erfolgreich beendet (Uhr auf 0)" : "MAXIMAL-DAUER ERREICHT (Deckel gegriffen)";
             
+            // FIX: Effektive Trainingszeit ist exakt die gewürfelte Zeit plus alle erlittenen Strafen
+            let realEffectiveSeconds = initialTargetDuration + totalPenaltySecondsSum;
+
             let logText = `=== CORNERTIME WÄCHTER REPORT ===\n`;
             logText += `Position: ${selPos}\nArmhaltung: ${selArm}\nBeinhaltung: ${selLeg}\n\n`;
             logText += `GEPLANTE DAUER: ${formatTime(initialTargetDuration)} (Bereich: ${minD}-${maxD}s)\n`;
             logText += `MAXIMAL-DECKEL: ${formatTime(capD)}s\n`;
             logText += `START-ZEIT:     ${startTimeStr}\n`;
             logText += `END-ZEIT:       ${endTimeStr}\n`;
-            logText += `EFFEKTIVE TRAININGSZEIT: ${formatTime(totalTimeElapsed)}\n\n`;
+            logText += `EFFEKTIVE TRAININGSZEIT: ${formatTime(realEffectiveSeconds)}\n\n`;
             logText += `--- EREIGNISSE ---\n`;
             if(logEvents.length === 0) { logText += `Keine Vorfälle. Perfekt gehalten!\n`; }
             else { logEvents.forEach(e => logText += e + `\n`); }
