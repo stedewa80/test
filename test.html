@@ -3,44 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Unbestechlicher Wächter Pro (Final)</title>
+    <title>CornerTime - Unbestechlicher Wächter Pro v3.0 (Full Setup)</title>
     <style>
         body { 
-            background-color: #121212; color: #fff; 
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
-            display: flex; flex-direction: column; align-items: center; 
-            justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; 
+            background-color: #121212; 
+            color: #ffffff; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            margin: 0; 
+            padding: 20px; 
+            box-sizing: border-box; 
         }
-        .app-container { width: 100%; max-width: 440px; text-align: center; }
-        .setup-screen, .log-screen { background: #1e1e1e; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: left; }
-        h2 { text-align: center; color: #00ffcc; margin-top: 0; margin-bottom: 20px; }
-        h3 { font-size: 0.9rem; color: #aaa; text-transform: uppercase; margin-top: 15px; margin-bottom: 8px; letter-spacing: 1px; }
-        .row { display: flex; gap: 10px; margin-bottom: 10px; }
-        .col { flex: 1; display: flex; flex-direction: column; }
-        label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
-        .custom-select, .custom-input { width: 100%; background: #2a2a2a; color: #fff; border: 2px solid #007aff; padding: 10px; border-radius: 10px; font-size: 1rem; font-weight: bold; outline: none; box-sizing: border-box; }
-        .custom-input { border-color: #555; font-variant-numeric: tabular-nums; }
-        .custom-input:focus { border-color: #00ffcc; }
+        .app-container { 
+            width: 100%; 
+            max-width: 440px; 
+            text-align: center; 
+        }
+        .setup-screen, .log-screen { 
+            background: #1e1e1e; 
+            padding: 25px; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5); 
+            text-align: left; 
+        }
+        h2 { 
+            text-align: center; 
+            color: #00ffcc; 
+            margin-top: 0; 
+            margin-bottom: 20px; 
+            font-size: 1.6rem;
+            letter-spacing: 0.5px;
+        }
+        h3 { 
+            font-size: 0.9rem; 
+            color: #aaa; 
+            text-transform: uppercase; 
+            margin-top: 20px; 
+            margin-bottom: 10px; 
+            letter-spacing: 1px; 
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+        .row { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 10px; 
+        }
+        .col { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+        }
+        label { 
+            font-size: 0.8rem; 
+            color: #888; 
+            margin-bottom: 4px; 
+            font-weight: 500;
+        }
+        .custom-select { 
+            width: 100%; 
+            background: #2a2a2a; 
+            color: #fff; 
+            border: 2px solid #007aff; 
+            padding: 12px; 
+            border-radius: 10px; 
+            font-size: 1rem; 
+            font-weight: bold; 
+            outline: none; 
+            box-sizing: border-box; 
+            margin-bottom: 12px;
+            appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+        }
+        .custom-input { 
+            width: 100%; 
+            background: #2a2a2a; 
+            color: #fff; 
+            border: 2px solid #555; 
+            padding: 10px; 
+            border-radius: 10px; 
+            font-size: 1rem; 
+            font-weight: bold; 
+            outline: none; 
+            box-sizing: border-box; 
+            font-variant-numeric: tabular-nums; 
+        }
+        .custom-input:focus { 
+            border-color: #00ffcc; 
+        }
+        .timer-display { 
+            font-size: 3.8rem; 
+            font-weight: 800; 
+            margin-bottom: 5px; 
+            font-variant-numeric: tabular-nums; 
+            text-align: center; 
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        #activeScreen, #logScreen { 
+            display: none; 
+            width: 100%; 
+        }
+        .status-message { 
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            margin-bottom: 15px; 
+            min-height: 2.5rem; 
+            color: #00ffcc; 
+            text-align: center; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .camera-box { 
+            width: 100%; 
+            border-radius: 20px; 
+            border: 8px solid #333333; 
+            overflow: hidden; 
+            background: #000; 
+            position: relative; 
+            aspect-ratio: 1 / 1; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+        }
+        canvas#processingCanvas { 
+            display: block; 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+        }
         
-        .timer-display { font-size: 3.5rem; font-weight: 800; margin-bottom: 5px; font-variant-numeric: tabular-nums; text-align: center; }
-        #activeScreen, #logScreen { display: none; width: 100%; }
-        .status-message { font-size: 1.1rem; font-weight: bold; margin-bottom: 15px; min-height: 2.5rem; color: #00ffcc; text-align: center; }
-        .camera-box { width: 100%; border-radius: 20px; border: 8px solid #333333; overflow: hidden; background: #000; position: relative; aspect-ratio: 1 / 1; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        canvas#processingCanvas { display: block; width: 100%; height: 100%; object-fit: cover; }
-        
-        .joint-indicator { position: absolute; width: 18px; height: 18px; border-radius: 50%; pointer-events: none; display: none; z-index: 9999; transform: translate(-50%, -50%); box-shadow: 0 0 6px rgba(0,0,0,0.9); }
+        /* Vollständige CSS-Struktur für die 14 Gelenk-Indikatoren */
+        .joint-indicator { 
+            position: absolute; 
+            width: 16px; 
+            height: 16px; 
+            border-radius: 50%; 
+            pointer-events: none; 
+            display: none; 
+            z-index: 9999; 
+            transform: translate(-50%, -50%); 
+            box-shadow: 0 0 6px rgba(0,0,0,0.9); 
+        }
         #ptHead { border: 3px solid #00ffcc; background: rgba(0,255,204,0.4); }
-        #ptLShoulder, #ptRShoulder { border: 3px solid #28a745; background: rgba(40,167,69,0.4); }
-        #ptLWrist, #ptRWrist { border: 3px solid #3399ff; background: rgba(51,153,255,0.4); }
-        #ptLElbow, #ptRElbow { border: 3px solid #ff00ff; background: rgba(255,0,255,0.4); }
-        #ptLHip, #ptRHip { border: 3px solid #ffaa00; background: rgba(255,170,0,0.4); }
-        #ptLKnee, #ptRKnee { border: 3px solid #ffea00; background: rgba(255,234,0,0.4); }
-        #ptLHeel, #ptRHeel { border: 3px solid #ff3333; background: rgba(255,51,51,0.4); }
+        #ptLShoulder { border: 3px solid #28a745; background: rgba(40,167,69,0.4); }
+        #ptRShoulder { border: 3px solid #28a745; background: rgba(40,167,69,0.4); }
+        #ptLWrist { border: 3px solid #3399ff; background: rgba(51,153,255,0.4); }
+        #ptRWrist { border: 3px solid #3399ff; background: rgba(51,153,255,0.4); }
+        #ptLElbow { border: 3px solid #ff00ff; background: rgba(255,0,255,0.4); }
+        #ptRElbow { border: 3px solid #ff00ff; background: rgba(255,0,255,0.4); }
+        #ptLHip { border: 3px solid #ffaa00; background: rgba(255,170,0,0.4); }
+        #ptRHip { border: 3px solid #ffaa00; background: rgba(255,170,0,0.4); }
+        #ptLKnee { border: 3px solid #ffea00; background: rgba(255,234,0,0.4); }
+        #ptRKnee { border: 3px solid #ffea00; background: rgba(255,234,0,0.4); }
+        #ptLFoot { border: 3px solid #ff3333; background: rgba(255,51,51,0.4); }
+        #ptRFoot { border: 3px solid #ff3333; background: rgba(255,51,51,0.4); }
         
-        button.start-btn { background: #007aff; color: white; border: none; padding: 16px; font-size: 1.2rem; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 20px; width: 100%; box-shadow: 0 4px 10px rgba(0,122,255,0.3); }
-        button.secondary-btn { background: #333; color: #fff; border: 1px solid #555; padding: 12px; font-size: 1rem; border-radius: 10px; cursor: pointer; width: 100%; margin-top: 10px; }
-        textarea.log-output { width: 100%; height: 250px; background: #111; color: #00ffcc; border: 1px solid #333; font-family: monospace; font-size: 0.85rem; padding: 10px; border-radius: 10px; box-sizing: border-box; resize: none; }
-        .verification-badge { padding: 12px; border-radius: 10px; font-weight: bold; text-align: center; margin-top: 10px; }
+        button.start-btn { 
+            background: #007aff; 
+            color: white; 
+            border: none; 
+            padding: 16px; 
+            font-size: 1.2rem; 
+            font-weight: bold; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            margin-top: 20px; 
+            width: 100%; 
+            box-shadow: 0 4px 10px rgba(0,122,255,0.3); 
+            transition: background 0.2s;
+        }
+        button.start-btn:hover { background: #0063cc; }
+        button.secondary-btn { 
+            background: #333; 
+            color: #fff; 
+            border: 1px solid #555; 
+            padding: 12px; 
+            font-size: 1rem; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            width: 100%; 
+            margin-top: 10px; 
+        }
+        button.secondary-btn:hover { background: #444; }
+        textarea.log-output { 
+            width: 100%; 
+            height: 250px; 
+            background: #111; 
+            color: #00ffcc; 
+            border: 1px solid #333; 
+            font-family: monospace; 
+            font-size: 0.85rem; 
+            padding: 12px; 
+            border-radius: 10px; 
+            box-sizing: border-box; 
+            resize: none; 
+        }
+        .verification-badge { 
+            padding: 12px; 
+            border-radius: 10px; 
+            font-weight: bold; 
+            text-align: center; 
+            margin-top: 10px; 
+            font-size: 0.95rem;
+        }
         .badge-success { background: rgba(40,167,69,0.2); color: #28a745; border: 1px solid #28a745; }
         .badge-error { background: rgba(220,53,69,0.2); color: #dc3545; border: 1px solid #dc3545; }
     </style>
@@ -56,24 +226,29 @@
             <h2>Wächter Pro Setup</h2>
             
             <h3>Haltungs-Matrix</h3>
+            <label for="positionSelect">Unterkörper-Basis</label>
             <select id="positionSelect" class="custom-select">
-                <option value="STEHEND">Stehend</option>
-                <option value="KNIEND_AUFRECHT">Kniend - aufrecht</option>
-                <option value="KNIEND_SITZEND">Kniend - auf Fersen sitzend</option>
-                <option value="KNIEND_VORGEBEUGT">Kniend - nach vorne gebeugt</option>
+                <option value="STEHEND">Stehend (Aufrecht, gestreckte Beine)</option>
+                <option value="KNIEND_AUFRECHT">Kniend - aufrecht (Hüfte gestreckt)</option>
+                <option value="KNIEND_SITZEND">Kniend - auf Fersen sitzend (Gesäß tief)</option>
+                <option value="KNIEND_VORGEBEUGT">Kniend - nach vorne gebeugt (Oberkörper tief)</option>
             </select>
+            
+            <label for="armSelect">Arm-Positionierung</label>
             <select id="armSelect" class="custom-select">
-                <option value="UEBER_KOPF">Gerade über dem Kopf</option>
-                <option value="AUF_KOPF">Auf dem Kopf (Hände auf Scheitel)</option>
-                <option value="HINTER_KOPF">Hinter dem Kopf (Verschränkt)</option>
-                <option value="DREIZACK">Seitlich neben dem Kopf (Dreizack)</option>
-                <option value="RUECKEN_ELLBOGEN">Hinter dem Rücken (greifen Ellbogen)</option>
-                <option value="RUECKEN_PO">Hinter dem Rücken (ruhen auf Po)</option>
+                <option value="UEBER_KOPF">Gerade über dem Kopf (Vertikal gestreckt)</option>
+                <option value="AUF_KOPF">Auf dem Kopf (Hände auf Scheitel, Ellbogen außen)</option>
+                <option value="HINTER_KOPF">Hinter dem Kopf (Ineinander verschränkt)</option>
+                <option value="DREIZACK">Seitlich neben dem Kopf (Dreizack-Haltung)</option>
+                <option value="RUECKEN_ELLBOGEN">Hinter dem Rücken (Hände greifen Ellbogen)</option>
+                <option value="RUECKEN_PO">Hinter dem Rücken (Hände ruhen flach auf Po)</option>
                 <option value="IGNORIEREN">Nicht sichtbar / Ignorieren</option>
             </select>
+            
+            <label for="legSelect">Bein-Spreizung</label>
             <select id="legSelect" class="custom-select">
-                <option value="ZUSAMMEN">Beine zusammen</option>
-                <option value="GESPREIZT">Beine gespreizt</option>
+                <option value="ZUSAMMEN">Beine zusammen (Geschlossene Knie/Füße)</option>
+                <option value="GESPREIZT">Beine gespreizt (Breiter Stand/Kniestand)</option>
                 <option value="IGNORIEREN">Nicht sichtbar / Ignorieren</option>
             </select>
             
@@ -91,7 +266,7 @@
             </div>
 
             <h3>Buddy Fälschungsschutz</h3>
-            <label>Gemeinsames Geheimwort (Salt)</label>
+            <label for="secretSalt">Gemeinsames Geheimwort (Salt)</label>
             <input type="text" id="secretSalt" class="custom-input" value="schweinehundbezwingen2026">
             
             <button class="start-btn" onclick="startApp()">WÄCHTER AKTIVIEREN</button>
@@ -116,8 +291,8 @@
                 <div id="ptRHip" class="joint-indicator"></div>
                 <div id="ptLKnee" class="joint-indicator"></div>
                 <div id="ptRKnee" class="joint-indicator"></div>
-                <div id="ptLHeel" class="joint-indicator"></div>
-                <div id="ptRHeel" class="joint-indicator"></div>
+                <div id="ptLFoot" class="joint-indicator"></div>
+                <div id="ptRFoot" class="joint-indicator"></div>
             </div>
         </div>
 
@@ -141,189 +316,217 @@
             head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), 
             lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist'), lE: document.getElementById('ptLElbow'), 
             rE: document.getElementById('ptRElbow'), lH: document.getElementById('ptLHip'), rH: document.getElementById('ptRHip'),
-            lK: document.getElementById('ptLKnee'), rK: document.getElementById('ptRKnee'), lF: document.getElementById('ptLHeel'), rF: document.getElementById('ptRHeel')
+            lK: document.getElementById('ptLKnee'), rK: document.getElementById('ptRKnee'), lF: document.getElementById('ptLFoot'), rF: document.getElementById('ptRFoot')
         };
 
         const punktNamenDe = {
-            'left_ear': 'Kopf', 'right_ear': 'Kopf',
             'left_shoulder': 'Linke Schulter', 'right_shoulder': 'Rechte Schulter',
             'left_elbow': 'Linker Ellbogen', 'right_elbow': 'Rechter Ellbogen',
             'left_wrist': 'Linkes Handgelenk', 'right_wrist': 'Rechtes Handgelenk',
             'left_hip': 'Linke Hüfte', 'right_hip': 'Rechte Hüfte',
             'left_knee': 'Linkes Knie', 'right_knee': 'Rechtes Knie',
-            'left_heel': 'Linke Ferse', 'right_heel': 'Rechte Ferse'
+            'left_heel': 'Linke Ferse', 'right_heel': 'Rechte Ferse',
+            'left_foot_index': 'Linke Fußspitze', 'right_foot_index': 'Rechte Fußspitze',
+            'left_ear': 'Kopf', 'right_ear': 'Kopf'
         };
 
         let selPos = "", selArm = "", selLeg = "";
         let minD = 30, maxD = 45, capD = 120, minP = 5, maxP = 10, salt = "";
         let detector = null, anchorPose = {}, isPrepared = false, latestKeypoints = {}, baseShoulderWidth = 100, wakeLock = null;
         let timeRemainingSeconds = 30, totalTimeElapsed = 0, workoutInterval = null, ruleCheckInterval = null;
-        let isGracePeriodActive = false, errorCounter = 0, remainingSecondsCounter = 3, appEnded = false;
-        let lastSpokenError = "", lastSpokenErrorTime = 0;
+        let isGracePeriodActive = false, remainingSecondsCounter = 3, appEnded = false;
         
+        let isAudioSpeakingBlock = false;
+
         let logEvents = [];
         let startTimeStr = "", initialTargetDuration = 0, totalPenaltiesCount = 0, totalPenaltySecondsSum = 0;
         let realStartTimestamp = 0, lastCheckpointTimestamp = 0;
 
-        function speak(text, force = false) {
+        // --- UNTERBRECHUNGSSICHERE AUDIO-ENGINE ---
+        function speak(text, force = false, callbackOnEnd = null) {
             try {
                 if (force) { window.speechSynthesis.cancel(); }
-                const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'de-DE'; utterance.rate = 1.1;
+                const utterance = new SpeechSynthesisUtterance(text); 
+                utterance.lang = 'de-DE'; 
+                utterance.rate = 1.15; 
+                if (callbackOnEnd) {
+                    utterance.onend = () => { callbackOnEnd(); };
+                }
                 window.speechSynthesis.speak(utterance);
-            } catch (e) { }
-        }
-
-        function speakErrorSmart(errorMessage) {
-            const now = Date.now();
-            if (errorMessage !== lastSpokenError || (now - lastSpokenErrorTime) > 3000) {
-                speak(errorMessage, true); lastSpokenError = errorMessage; lastSpokenErrorTime = now;
+            } catch (e) { 
+                console.log("Audio-Fehler", e);
+                if (callbackOnEnd) callbackOnEnd(); 
             }
         }
 
         function formatTime(totalSeconds) {
-            const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-            const secs = (totalSeconds % 60).toString().padStart(2, '0');
+            const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0'); 
+            const secs = (totalSeconds % 60).toString().padStart(2, '0'); 
             return `${mins}:${secs}`;
         }
 
-        function updateTimerUI() {
-            timerDisplay.innerText = formatTime(timeRemainingSeconds);
-        }
+        function updateTimerUI() { timerDisplay.innerText = formatTime(timeRemainingSeconds); }
 
         function f(part) { return latestKeypoints[part] && latestKeypoints[part].score > 0.4; }
 
+        function getBestFootY(side) {
+            const heel = side === 'left' ? 'left_heel' : 'right_heel'; 
+            const tip = side === 'left' ? 'left_foot_index' : 'right_foot_index';
+            if (f(heel)) return latestKeypoints[heel].y; 
+            if (f(tip)) return latestKeypoints[tip].y; 
+            return 0;
+        }
+
+        function hasAnyFoot(side) { 
+            return f(side === 'left' ? 'left_heel' : 'right_heel') || f(side === 'left' ? 'left_foot_index' : 'right_foot_index'); 
+        }
+
         async function generateHMAC(text, secret) {
-            const encoder = new TextEncoder();
-            const keyData = encoder.encode(secret);
+            const encoder = new TextEncoder(); 
+            const keyData = encoder.encode(secret); 
             const msgData = encoder.encode(text);
             const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
             const signature = await crypto.subtle.sign('HMAC', cryptoKey, msgData);
             return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
+        // --- UNGEKÜRZTE, ORIGINAL-VALIDIERUNGS-MATRIX ---
         function validateHaltung() {
             if (!f('left_shoulder') || !f('right_shoulder')) return { valid: false, msg: "Körper nicht im Bild" };
             
-            const sb = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.right_shoulder.y - latestKeypoints.right_shoulder.y, 2));
-            const headY = (f('left_ear') && f('right_ear')) ? (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2 : (latestKeypoints.left_eye && latestKeypoints.right_eye ? (latestKeypoints.left_eye.y + latestKeypoints.right_eye.y)/2 : 0);
+            const sb = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
+            
+            let headY = 0;
+            if (f('left_ear') && f('right_ear')) { headY = (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2; } 
+            else if (f('left_eye') && f('right_eye')) { headY = (latestKeypoints.left_eye.y + latestKeypoints.right_eye.y) / 2; }
+            
             const shoulderY = (latestKeypoints.left_shoulder.y + latestKeypoints.right_shoulder.y) / 2;
             
+            // 1. UNTERKÖRPER-BASIS
             if (selPos === "STEHEND") {
-                if (!f('left_hip') || !f('right_hip') || !f('left_heel') || !f('right_heel')) {
+                if (!f('left_hip') || !f('right_hip') || !hasAnyFoot('left') || !hasAnyFoot('right')) {
                     if (headY === 0 || headY > shoulderY || (shoulderY - headY) < 0.3 * sb) return { valid: false, msg: "Bitte gerade stehen" };
                 } else {
-                    const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
-                    const heelY = (latestKeypoints.left_heel.y + latestKeypoints.right_heel.y) / 2;
-                    if ((heelY - hipY) <= 2.0 * sb) return { valid: false, msg: "Bitte Beine strecken" };
+                    const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2; 
+                    const footY = (getBestFootY('left') + getBestFootY('right')) / 2;
+                    if ((footY - hipY) <= 2.0 * sb) return { valid: false, msg: "Bitte Beine strecken" };
                 }
             }
             if (selPos === "KNIEND_AUFRECHT") {
-                if (!f('left_hip') || !f('right_hip') || !f('left_heel') || !f('right_heel')) return { valid: false, msg: "Unterkörper nicht sichtbar" };
-                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
-                const heelY = (latestKeypoints.left_heel.y + latestKeypoints.right_heel.y) / 2;
-                if ((heelY - hipY) < 1.1 * sb || (heelY - hipY) > 1.8 * sb) return { valid: false, msg: "Bitte aufrecht knien" };
+                if (!f('left_hip') || !f('right_hip') || !hasAnyFoot('left') || !hasAnyFoot('right')) return { valid: false, msg: "Unterkörper nicht sichtbar" };
+                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2; 
+                const footY = (getBestFootY('left') + getBestFootY('right')) / 2;
+                if ((footY - hipY) < 1.1 * sb || (footY - hipY) > 1.8 * sb) return { valid: false, msg: "Bitte aufrecht knien" };
             }
             if (selPos === "KNIEND_SITZEND") {
-                if (!f('left_hip') || !f('right_hip') || !f('left_heel') || !f('right_heel')) return { valid: false, msg: "Unterkörper nicht sichtbar" };
-                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
-                const heelY = (latestKeypoints.left_heel.y + latestKeypoints.right_heel.y) / 2;
-                if ((heelY - hipY) >= 0.7 * sb) return { valid: false, msg: "Bitte auf Fersen setzen" };
+                if (!f('left_hip') || !f('right_hip') || !hasAnyFoot('left') || !hasAnyFoot('right')) return { valid: false, msg: "Unterkörper nicht sichtbar" };
+                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2; 
+                const footY = (getBestFootY('left') + getBestFootY('right')) / 2;
+                if ((footY - hipY) >= 0.7 * sb) return { valid: false, msg: "Bitte auf Fersen setzen" };
             }
             if (selPos === "KNIEND_VORGEBEUGT") {
-                if (f('left_hip') && f('right_hip')) {
-                    const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
-                    if (shoulderY < hipY) return { valid: false, msg: "Bitte nach vorne beugen" };
-                } else {
-                    if (headY !== 0 && (shoulderY - headY) > 0.4 * sb) return { valid: false, msg: "Bitte tiefer beugen" };
+                if (f('left_hip') && f('right_hip')) { 
+                    const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2; 
+                    if (shoulderY < hipY) return { valid: false, msg: "Bitte nach vorne beugen" }; 
+                } else { 
+                    if (headY !== 0 && (shoulderY - headY) > 0.4 * sb) return { valid: false, msg: "Bitte tiefer beugen" }; 
                 }
             }
 
+            // 2. BEIN-SPREIZUNG
             if (selLeg === "ZUSAMMEN") {
-                let legDistance = 0, hasPoints = false;
-                if (f('left_knee') && f('right_knee')) { legDistance = Math.abs(latestKeypoints.left_knee.x - latestKeypoints.right_knee.x); hasPoints = true; }
+                let legDistance = 0, hasPoints = false; 
+                if (f('left_knee') && f('right_knee')) { legDistance = Math.abs(latestKeypoints.left_knee.x - latestKeypoints.right_knee.x); hasPoints = true; } 
                 else if (f('left_foot_index') && f('right_foot_index')) { legDistance = Math.abs(latestKeypoints.left_foot_index.x - latestKeypoints.right_foot_index.x); hasPoints = true; }
                 if (hasPoints && legDistance > 0.85 * sb) return { valid: false, msg: "Bitte Beine schließen" };
             }
             if (selLeg === "GESPREIZT") {
-                let legDistance = 0, hasPoints = false;
-                if (f('left_knee') && f('right_knee')) { legDistance = Math.abs(latestKeypoints.left_knee.x - latestKeypoints.right_knee.x); hasPoints = true; }
+                let legDistance = 0, hasPoints = false; 
+                if (f('left_knee') && f('right_knee')) { legDistance = Math.abs(latestKeypoints.left_knee.x - latestKeypoints.right_knee.x); hasPoints = true; } 
                 else if (f('left_foot_index') && f('right_foot_index')) { legDistance = Math.abs(latestKeypoints.left_foot_index.x - latestKeypoints.right_foot_index.x); hasPoints = true; }
                 if (!hasPoints || legDistance < 1.25 * sb) return { valid: false, msg: "Bitte Beine spreizen" };
             }
 
+            // 3. ARM-POSITIONIERUNG
             if (selArm === "UEBER_KOPF") {
-                if (!f('left_wrist') || !f('right_wrist') || headY === 0) return { valid: false, msg: "Hände nicht sichtbar" };
+                if (!f('left_wrist') || !f('right_wrist') || headY === 0) return { valid: false, msg: "Hände nicht sichtbar" }; 
                 if (latestKeypoints.left_wrist.y > headY || latestKeypoints.right_wrist.y > headY) return { valid: false, msg: "Hände gerade über Kopf" };
             }
             if (selArm === "AUF_KOPF") {
-                if (!f('left_wrist') || !f('right_wrist') || !f('left_elbow') || !f('right_elbow')) return { valid: false, msg: "Arme nicht sichtbar" };
-                if (Math.abs(latestKeypoints.left_wrist.y - headY) > 0.3 * sb || Math.abs(latestKeypoints.right_wrist.y - headY) > 0.3 * sb) return { valid: false, msg: "Hände auf den Kopf legen" };
+                if (!f('left_wrist') || !f('right_wrist') || !f('left_elbow') || !f('right_elbow')) return { valid: false, msg: "Arme nicht sichtbar" }; 
+                if (Math.abs(latestKeypoints.left_wrist.y - headY) > 0.3 * sb || Math.abs(latestKeypoints.right_wrist.y - headY) > 0.3 * sb) return { valid: false, msg: "Hände auf den Kopf legen" }; 
                 if (Math.abs(latestKeypoints.left_elbow.x - latestKeypoints.right_elbow.x) < 1.35 * sb) return { valid: false, msg: "Ellbogen weiter nach außen" };
             }
             if (selArm === "HINTER_KOPF") {
-                if (!f('left_elbow') || !f('right_elbow')) return { valid: false, msg: "Ellbogen nicht sichtbar" };
+                if (!f('left_elbow') || !f('right_elbow')) return { valid: false, msg: "Ellbogen nicht sichtbar" }; 
                 if (Math.abs(latestKeypoints.left_elbow.x - latestKeypoints.right_elbow.x) < 1.45 * sb) return { valid: false, msg: "Ellbogen nach hinten drücken" };
             }
             if (selArm === "DREIZACK") {
-                if (!f('left_elbow') || !f('right_elbow') || !f('left_wrist') || !f('right_wrist')) return { valid: false, msg: "Dreizack unvollständig" };
-                if (Math.abs(latestKeypoints.left_elbow.y - shoulderY) > 0.3 * sb || Math.abs(latestKeypoints.right_elbow.y - shoulderY) > 0.3 * sb) return { valid: false, msg: "Ellbogen auf Schulterhöhe" };
+                if (!f('left_elbow') || !f('right_elbow') || !f('left_wrist') || !f('right_wrist')) return { valid: false, msg: "Dreizack unvollständig" }; 
+                if (Math.abs(latestKeypoints.left_elbow.y - shoulderY) > 0.3 * sb || Math.abs(latestKeypoints.right_elbow.y - shoulderY) > 0.3 * sb) return { valid: false, msg: "Ellbogen auf Schulterhöhe" }; 
                 if (latestKeypoints.left_wrist.y > latestKeypoints.left_elbow.y || latestKeypoints.right_wrist.y > latestKeypoints.right_elbow.y) return { valid: false, msg: "Unterarme senkrecht nach oben" };
             }
             if (selArm === "RUECKEN_ELLBOGEN") {
-                if (!f('left_elbow') || !f('right_elbow')) return { valid: false, msg: "Arme hinten verschränken" };
+                if (!f('left_elbow') || !f('right_elbow')) return { valid: false, msg: "Arme hinten verschränken" }; 
                 if (Math.abs(latestKeypoints.left_elbow.x - latestKeypoints.right_elbow.x) > 0.95 * sb) return { valid: false, msg: "Gegenseitig Ellbogen greifen" };
             }
-             if (selArm === "RUECKEN_PO") {
-                if (!f('left_wrist') || !f('right_wrist') || !f('left_hip') || !f('right_hip')) return { valid: false, msg: "Hände hinten tief" };
-                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
+            if (selArm === "RUECKEN_PO") {
+                if (!f('left_wrist') || !f('right_wrist') || !f('left_hip') || !f('right_hip')) return { valid: false, msg: "Hände hinten tief" }; 
+                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2; 
                 if (Math.abs(latestKeypoints.left_wrist.y - hipY) > 0.4 * sb || Math.abs(latestKeypoints.right_wrist.y - hipY) > 0.4 * sb) return { valid: false, msg: "Hände flach auf Gesäß legen" };
             }
-
+            
             return { valid: true, msg: "Überwachung aktiv! 🟢" };
         }
 
         async function startApp() {
-            selPos = document.getElementById('positionSelect').value;
-            selArm = document.getElementById('armSelect').value;
+            selPos = document.getElementById('positionSelect').value; 
+            selArm = document.getElementById('armSelect').value; 
             selLeg = document.getElementById('legSelect').value;
-            minD = parseInt(document.getElementById('minDuration').value);
-            maxD = parseInt(document.getElementById('maxDuration').value);
+            minD = parseInt(document.getElementById('minDuration').value); 
+            maxD = parseInt(document.getElementById('maxDuration').value); 
             capD = parseInt(document.getElementById('capDuration').value);
-            minP = parseInt(document.getElementById('minPenalty').value);
-            maxP = parseInt(document.getElementById('maxPenalty').value);
+            minP = parseInt(document.getElementById('minPenalty').value); 
+            maxP = parseInt(document.getElementById('maxPenalty').value); 
             salt = document.getElementById('secretSalt').value;
 
-            document.getElementById('setupScreen').style.display = 'none';
+            document.getElementById('setupScreen').style.display = 'none'; 
             document.getElementById('activeScreen').style.display = 'block';
             
-            timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD;
-            initialTargetDuration = timeRemainingSeconds;
+            timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD; 
+            initialTargetDuration = timeRemainingSeconds; 
             updateTimerUI();
             
             try {
                 status.innerText = "Kamera-Zugriff anfordern...";
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } }); 
                 video.srcObject = stream;
                 
                 video.onloadedmetadata = async () => {
                     try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { }
                     status.innerText = "Lade MediaPipe-Modell...";
                     detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { 
-                        runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404' 
+                        runtime: 'mediapipe', 
+                        modelType: 'lite', 
+                        solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404' 
                     });
                     
-                    status.innerText = "In Position gehen! (5s)"; status.style.color = "#ffaa00"; speak("In Position gehen", true);
+                    status.innerText = "In Position gehen! (5s)"; 
+                    status.style.color = "#ffaa00"; 
+                    speak("In Position gehen", true); 
                     loop();
                     
                     setTimeout(() => {
-                        let result = validateHaltung();
+                        let result = validateHaltung(); 
                         if (result.valid) { initWorkout(); } 
                         else {
-                            status.innerText = result.msg; status.style.color = "#ff3333"; speakErrorSmart(result.msg);
+                            status.innerText = result.msg; 
+                            status.style.color = "#ff3333"; 
+                            speak(result.msg, true);
                             let retryAnchor = setInterval(() => {
-                                let check = validateHaltung();
-                                if (check.valid) { initWorkout(); clearInterval(retryAnchor); }
-                                else { status.innerText = check.msg; speakErrorSmart(check.msg); }
+                                let check = validateHaltung(); 
+                                if (check.valid) { initWorkout(); clearInterval(retryAnchor); } 
+                                else { status.innerText = check.msg; }
                             }, 1000);
                         }
                     }, 5000);
@@ -332,18 +535,16 @@
         }
 
         function initWorkout() {
-            realStartTimestamp = Date.now();
+            realStartTimestamp = Date.now(); 
             startTimeStr = new Date(realStartTimestamp).toLocaleString('de-DE');
             setNewAnchor("Wächter aktiv");
             
             workoutInterval = setInterval(() => {
                 if (isPrepared && !appEnded) {
                     totalTimeElapsed++;
-                    if (!isGracePeriodActive) {
-                        timeRemainingSeconds--; updateTimerUI();
-                    }
-                    if (totalTimeElapsed >= capD || timeRemainingSeconds <= 0) {
-                        endWorkout(totalTimeElapsed >= capD ? "CAP_REACHED" : "SUCCESS");
+                    if (!isGracePeriodActive && !isAudioSpeakingBlock) { timeRemainingSeconds--; updateTimerUI(); }
+                    if (totalTimeElapsed >= capD || timeRemainingSeconds <= 0) { 
+                        endWorkout(totalTimeElapsed >= capD ? "CAP_REACHED" : "SUCCESS"); 
                     }
                 }
             }, 1000);
@@ -353,180 +554,228 @@
         function setNewAnchor(audioMessage) {
             anchorPose = {};
             if (f('left_shoulder') && f('right_shoulder')) {
-                baseShoulderWidth = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.right_shoulder.y - latestKeypoints.right_shoulder.y, 2));
+                baseShoulderWidth = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
             }
-            const trackingList = ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_hip', 'right_hip', 'left_knee', 'right_knee', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist', 'left_heel', 'right_heel'];
+            const trackingList = ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_hip', 'right_hip', 'left_knee', 'right_knee', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist', 'left_heel', 'right_heel', 'left_foot_index', 'right_foot_index'];
             trackingList.forEach(j => { if (f(j)) anchorPose[j] = { x: latestKeypoints[j].x, y: latestKeypoints[j].y }; });
             
-            isPrepared = true; isGracePeriodActive = false; errorCounter = 0; remainingSecondsCounter = 3;
-            lastCheckpointTimestamp = Date.now(); // Immunität starten
-            status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333";
+            isPrepared = true; 
+            isGracePeriodActive = false; 
+            isAudioSpeakingBlock = false; 
+            remainingSecondsCounter = 3; 
+            lastCheckpointTimestamp = Date.now();
+            
+            status.innerText = "Überwachung aktiv! 🟢"; 
+            status.style.color = "#00ffcc"; 
+            timerDisplay.style.color = "#ffffff"; 
+            container.style.borderColor = "#333333";
             if (audioMessage) speak(audioMessage, true);
         }
 
         async function loop() {
-            if (appEnded) return;
-            canvas.width = 257; canvas.height = 257;
-            const minDim = Math.min(video.videoWidth, video.videoHeight || 480);
-            ctx.save(); ctx.translate(257, 0); ctx.scale(-1, 1);
-            ctx.drawImage(video, (video.videoWidth - minDim) / 2, (video.videoHeight - minDim) / 2, minDim, minDim, 0, 0, 257, 257); ctx.restore();
+            if (appEnded) return; 
+            canvas.width = 257; 
+            canvas.height = 257;
             
-            if (detector && video.readyState >= 2) {
-                const poses = await detector.estimatePoses(canvas);
-                if (poses && poses.length > 0) {
-                    poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; });
-                }
+            const minDim = Math.min(video.videoWidth, video.videoHeight || 480);
+            ctx.save(); 
+            ctx.translate(257, 0); 
+            ctx.scale(-1, 1); 
+            ctx.drawImage(video, (video.videoWidth - minDim) / 2, (video.videoHeight - minDim) / 2, minDim, minDim, 0, 0, 257, 257); 
+            ctx.restore();
+            
+            if (detector && video.readyState >= 2) { 
+                const poses = await detector.estimatePoses(canvas); 
+                if (poses && poses.length > 0) { 
+                    poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; }); 
+                } 
             }
-
+            
             const drawPoint = (el, part) => { 
                 if (f(part)) { 
-                    el.style.left = `${(latestKeypoints[part].x / 257) * container.clientWidth}px`; el.style.top = `${(latestKeypoints[part].y / 257) * container.clientHeight}px`; el.style.display = 'block'; 
-                } else { el.style.display = 'none'; } 
+                    el.style.left = `${(latestKeypoints[part].x / 257) * container.clientWidth}px`; 
+                    el.style.top = `${(latestKeypoints[part].y / 257) * container.clientHeight}px`; 
+                    el.style.display = 'block'; 
+                } else { 
+                    el.style.display = 'none'; 
+                } 
             };
-            drawPoint(pts.lS, 'left_shoulder'); drawPoint(pts.rS, 'right_shoulder');
-            drawPoint(pts.lW, 'left_wrist'); drawPoint(pts.rW, 'right_wrist');
-            drawPoint(pts.lE, 'left_elbow'); drawPoint(pts.rE, 'right_elbow');
-            drawPoint(pts.lH, 'left_hip'); drawPoint(pts.rH, 'right_hip');
-            drawPoint(pts.lK, 'left_knee'); drawPoint(pts.rK, 'right_knee');
-            drawPoint(pts.lF, 'left_heel'); drawPoint(pts.rF, 'right_heel');
-            if (f('left_ear') && f('right_ear')) { pts.head.style.left = `${(((latestKeypoints.left_ear.x + latestKeypoints.right_ear.x)/2) / 257) * container.clientWidth}px`; pts.head.style.top = `${(((latestKeypoints.left_ear.y + latestKeypoints.right_ear.y)/2) / 257) * container.clientHeight}px`; pts.head.style.display = 'block'; } else { pts.head.style.display = 'none'; }
+            
+            drawPoint(pts.lS, 'left_shoulder'); 
+            drawPoint(pts.rS, 'right_shoulder'); 
+            drawPoint(pts.lW, 'left_wrist'); 
+            drawPoint(pts.rW, 'right_wrist'); 
+            drawPoint(pts.lE, 'left_elbow'); 
+            drawPoint(pts.rE, 'right_elbow'); 
+            drawPoint(pts.lH, 'left_hip'); 
+            drawPoint(pts.rH, 'right_hip'); 
+            drawPoint(pts.lK, 'left_knee'); 
+            drawPoint(pts.rK, 'right_knee');
+            
+            if (f('left_heel')) drawPoint(pts.lF, 'left_heel'); else drawPoint(pts.lF, 'left_foot_index');
+            if (f('right_heel')) drawPoint(pts.rF, 'right_heel'); else drawPoint(pts.rF, 'right_foot_index');
 
+            if (f('left_ear') && f('right_ear')) { 
+                pts.head.style.left = `${(((latestKeypoints.left_ear.x + latestKeypoints.right_ear.x)/2) / 257) * container.clientWidth}px`; 
+                pts.head.style.top = `${(((latestKeypoints.left_ear.y + latestKeypoints.right_ear.y)/2) / 257) * container.clientHeight}px`; 
+                pts.head.style.display = 'block'; 
+            } else { 
+                pts.head.style.display = 'none'; 
+            }
+            
             requestAnimationFrame(loop);
         }
 
         async function checkRules() {
-            if (Date.now() - lastCheckpointTimestamp < 2000) return; // 2s Immunitätsschutz nach Checkpoint
+            if (Date.now() - lastCheckpointTimestamp < 2000) return; 
             if (!detector || !isPrepared || appEnded) return;
             
             if (isGracePeriodActive) {
+                if (isAudioSpeakingBlock) {
+                    status.innerText = "Haltung verletzt! Bitte zuhören... ⏳";
+                    status.style.color = "#ffaa00"; 
+                    container.style.borderColor = "#ffaa00";
+                    return; 
+                }
+
                 if (remainingSecondsCounter > 0) {
-                    status.innerText = `KORREKTURZEIT! Noch ${remainingSecondsCounter}s... ⏳`;
-                    status.style.color = "#ffaa00"; timerDisplay.style.color = "#ffaa00"; container.style.borderColor = "#ffaa00";
-                    speak(remainingSecondsCounter.toString(), true); remainingSecondsCounter--;
+                    status.innerText = `KORREKTURZEIT! Noch ${remainingSecondsCounter}s... ⏳`; 
+                    status.style.color = "#ffaa00"; 
+                    timerDisplay.style.color = "#ffaa00"; 
+                    container.style.borderColor = "#ffaa00";
+                    
+                    isAudioSpeakingBlock = true;
+                    speak(remainingSecondsCounter.toString(), false, () => { 
+                        isAudioSpeakingBlock = false; 
+                        remainingSecondsCounter--; 
+                    });
                 } else {
                     let check = validateHaltung();
                     if (check.valid) { 
-                        const timeStamp = new Date().toLocaleTimeString('de-DE');
-                        logEvents.push(`[${timeStamp}] CHECKPOINT: Position erfolgreich wiederhergestellt.`);
+                        const timeStamp = new Date().toLocaleTimeString('de-DE'); 
+                        logEvents.push(`[${timeStamp}] CHECKPOINT: Position erfolgreich wiederhergestellt.`); 
                         setNewAnchor("Checkpoint"); 
                     } else {
-                        let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
-                        timeRemainingSeconds += penalty; totalPenaltiesCount++; totalPenaltySecondsSum += penalty;
+                        let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP; 
+                        timeRemainingSeconds += penalty; 
+                        totalPenaltiesCount++; 
+                        totalPenaltySecondsSum += penalty; 
                         updateTimerUI();
                         
-                        const timeStamp = new Date().toLocaleTimeString('de-DE');
+                        const timeStamp = new Date().toLocaleTimeString('de-DE'); 
                         logEvents.push(`[${timeStamp}] ESKALATION: Haltung falsch (${check.msg}) -> FOLGE-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
                         
-                        speak(`${check.msg}. Strafe plus ${penalty} Sekunden`, true);
-                        status.innerText = `${check.msg.toUpperCase()}! +${penalty}s! ⏳`;
-                        status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; remainingSecondsCounter = 3;
+                        isAudioSpeakingBlock = true;
+                        status.innerText = `${check.msg.toUpperCase()}! +${penalty}s! ⏳`; 
+                        status.style.color = "#ff3333"; 
+                        timerDisplay.style.color = "#ff3333";
+                        
+                        speak(`${check.msg}. Strafe plus ${penalty} Sekunden.`, true, () => {
+                            isAudioSpeakingBlock = false;
+                            remainingSecondsCounter = 3; 
+                        });
                     }
                 }
                 return;
             }
 
-            let brokenJoint = "";
-            let globalDriftDetected = false;
+            let brokenJoint = ""; 
+            let globalDriftDetected = false; 
             const allowedDeviation = 0.14 * baseShoulderWidth;
 
-            for (const joint in anchorPose) {
-                if (f(joint)) {
-                    const dist = Math.sqrt(Math.pow(latestKeypoints[joint].x - anchorPose[joint].x, 2) + Math.pow(latestKeypoints[joint].y - anchorPose[joint].y, 2));
+            for (const joint in anchorPose) { 
+                if (f(joint)) { 
+                    const dist = Math.sqrt(Math.pow(latestKeypoints[joint].x - anchorPose[joint].x, 2) + Math.pow(latestKeypoints[joint].y - anchorPose[joint].y, 2)); 
                     if (dist > allowedDeviation) { 
                         globalDriftDetected = true; 
-                        brokenJoint = punktNamenDe[joint] || joint;
+                        brokenJoint = punktNamenDe[joint] || joint; 
                         break; 
-                    }
-                }
+                    } 
+                } 
             }
 
             if (globalDriftDetected) {
+                let check = validateHaltung();
                 isGracePeriodActive = true; 
-                remainingSecondsCounter = 3; 
+                isAudioSpeakingBlock = true; 
+                remainingSecondsCounter = 3;
                 
-                let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
-                timeRemainingSeconds += penalty; totalPenaltiesCount++; totalPenaltySecondsSum += penalty;
+                let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP; 
+                timeRemainingSeconds += penalty; 
+                totalPenaltiesCount++; 
+                totalPenaltySecondsSum += penalty; 
                 updateTimerUI();
                 
-                const timeStamp = new Date().toLocaleTimeString('de-DE');
+                const timeStamp = new Date().toLocaleTimeString('de-DE'); 
                 logEvents.push(`[${timeStamp}] DRIFT: Bewegung erkannt bei [${brokenJoint}] -> SOFORT-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
                 
-                speak(`Bewegung erkannt. ${brokenJoint}. Plus ${penalty} Sekunden. Haltung korrigieren.`, true); 
+                speak(`Bewegung erkannt. ${brokenJoint}. Plus ${penalty} Sekunden. Haltung korrigieren.`, true, () => {
+                    isAudioSpeakingBlock = false; 
+                }); 
             }
         }
 
         async function endWorkout(endReason) {
-            appEnded = true;
-            clearInterval(workoutInterval); clearInterval(ruleCheckInterval);
-            isPrepared = false; if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
+            appEnded = true; 
+            clearInterval(workoutInterval); 
+            clearInterval(ruleCheckInterval); 
+            isPrepared = false; 
+            if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
             
-            const endTimestamp = Date.now();
+            const endTimestamp = Date.now(); 
             const endTimeStr = new Date(endTimestamp).toLocaleString('de-DE');
             let statusText = endReason === "SUCCESS" ? "Erfolgreich beendet (Uhr auf 0)" : "MAXIMAL-DAUER ERREICHT (Deckel gegriffen)";
-            
             let realEffectiveSeconds = Math.round((endTimestamp - realStartTimestamp) / 1000);
 
-            let logText = `=== CORNERTIME WÄCHTER REPORT ===\n`;
+            let logText = `=== CORNERTIME WÄCHTER REPORT ===\n`; 
             logText += `Position: ${selPos}\nArmhaltung: ${selArm}\nBeinhaltung: ${selLeg}\n\n`;
-            logText += `GEPLANTE DAUER: ${formatTime(initialTargetDuration)} (Bereich: ${minD}-${maxD}s)\n`;
+            logText += `GEPLANTE DAUER: ${formatTime(initialTargetDuration)} (Bereich: ${minD}-${maxD}s)\n`; 
             logText += `MAXIMAL-DECKEL: ${formatTime(capD)}s\n`;
-            logText += `START-ZEIT:     ${startTimeStr}\n`;
-            logText += `END-ZEIT:       ${endTimeStr}\n`;
+            logText += `START-ZEIT:     ${startTimeStr}\n`; 
+            logText += `END-ZEIT:       ${endTimeStr}\n`; 
             logText += `EFFEKTIVE TRAININGSZEIT: ${formatTime(realEffectiveSeconds)}\n\n`;
-            logText += `--- EREIGNISSE ---\n`;
-            if(logEvents.length === 0) { logText += `Keine Vorfälle. Perfekt gehalten!\n`; }
-            else { logEvents.forEach(e => logText += e + `\n`); }
-            logText += `\nSTATUS AM ENDE: ${statusText}\n`;
-            logText += `Gesamtzahl Strafen: ${totalPenaltiesCount}\n`;
-            logText += `Gesamte Strafzeit:  +${totalPenaltySecondsSum} Sekunden\n`;
+            logText += `--- EREIGNISSE ---\n`; 
+            if(logEvents.length === 0) { logText += `Keine Vorfälle. Perfekt gehalten!\n`; } else { logEvents.forEach(e => logText += e + `\n`); }
+            logText += `\nSTATUS AM ENDE: ${statusText}\n`; 
+            logText += `Gesamtzahl Strafen: ${totalPenaltiesCount}\n`; 
+            logText += `Gesamte Strafzeit:  +${totalPenaltySecondsSum} Sekunden\n`; 
             logText += `=================================\n`;
             
-            const hash = await generateHMAC(logText, salt);
+            const hash = await generateHMAC(logText, salt); 
             logText += `SIGNATUR: ${hash}\n`;
-
-            document.getElementById('activeScreen').style.display = 'none';
-            document.getElementById('logScreen').style.display = 'block';
+            
+            document.getElementById('activeScreen').style.display = 'none'; 
+            document.getElementById('logScreen').style.display = 'block'; 
             document.getElementById('logOutput').value = logText;
             
-            if(endReason === "SUCCESS") { speak("Training beendet. Ausgezeichnet.", true); }
-            else { speak("Maximalzeit erreicht. Abbruch.", true); }
+            if(endReason === "SUCCESS") { speak("Training beendet. Ausgezeichnet.", true); } else { speak("Maximalzeit erreicht. Abbruch.", true); }
         }
 
-        function showVerificationOption() {
-            document.getElementById('setupScreen').style.display = 'none';
-            document.getElementById('logScreen').style.display = 'block';
-            document.getElementById('logTitle').innerText = "Logfile verifizieren";
-            document.getElementById('logOutput').value = "";
-            document.getElementById('logOutput').readOnly = false;
-            document.getElementById('logOutput').placeholder = "Füge hier das Logfile deines Buddies ein...";
-            document.getElementById('buddyVerifyBox').style.display = 'block';
+        function showVerificationOption() { 
+            document.getElementById('setupScreen').style.display = 'none'; 
+            document.getElementById('logScreen').style.display = 'block'; 
+            document.getElementById('logTitle').innerText = "Logfile verifizieren"; 
+            document.getElementById('logOutput').value = ""; 
+            document.getElementById('logOutput').readOnly = false; 
+            document.getElementById('logOutput').placeholder = "Füge hier das Logfile deines Buddies ein..."; 
+            document.getElementById('buddyVerifyBox').style.display = 'block'; 
         }
-
+        
         async function verifyPastedLog() {
-            const rawInput = document.getElementById('logOutput').value;
-            const saltCheck = document.getElementById('secretSalt').value;
-            const badge = document.getElementById('verifyBadge');
+            const rawInput = document.getElementById('logOutput').value; 
+            const saltCheck = document.getElementById('secretSalt').value; 
+            const badge = document.getElementById('verifyBadge'); 
             badge.style.display = "block";
-
             try {
-                const lines = rawInput.split('\n');
-                let sigLineIndex = lines.findIndex(l => l.startsWith('SIGNATUR: '));
-                if(sigLineIndex === -1) {
-                    badge.className = "verification-badge badge-error"; badge.innerText = "❌ UNGÜLTIG: Keine Signatur gefunden!"; return;
-                }
-                const providedSignature = lines[sigLineIndex].replace('SIGNATUR: ', '').trim();
-                let textToVerify = lines.slice(0, sigLineIndex).join('\n') + '\n';
+                const lines = rawInput.split('\n'); 
+                let sigLineIndex = lines.findIndex(l => l.startsWith('SIGNATUR: ')); 
+                if(sigLineIndex === -1) { badge.className = "verification-badge badge-error"; badge.innerText = "❌ UNGÜLTIG: Keine Signatur gefunden!"; return; }
+                const providedSignature = lines[sigLineIndex].replace('SIGNATUR: ', '').trim(); 
+                let textToVerify = lines.slice(0, sigLineIndex).join('\n') + '\n'; 
                 const computedSignature = await generateHMAC(textToVerify, saltCheck);
-
-                if(providedSignature === computedSignature) {
-                    badge.className = "verification-badge badge-success"; badge.innerText = "✅ AUTHENTISCH: Logfile ist zu 100% echt und unmanipuliert!";
-                } else {
-                    badge.className = "verification-badge badge-error"; badge.innerText = "❌ MANIPULIERT: Text oder Einstellungen wurden nachträglich verändert!";
-                }
-            } catch (err) {
-                badge.className = "verification-badge badge-error"; badge.innerText = "❌ FEHLER: Logfile-Format fehlerhaft!";
-            }
+                if(providedSignature === computedSignature) { badge.className = "verification-badge badge-success"; badge.innerText = "✅ AUTHENTISCH: Logfile ist zu 100% echt und unmanipuliert!"; } else { badge.className = "verification-badge badge-error"; badge.innerText = "❌ MANIPULIERT: Text oder Einstellungen wurden nachträglich verändert!"; }
+            } catch (err) { badge.className = "verification-badge badge-error"; badge.innerText = "❌ FEHLER: Logfile-Format fehlerhaft!"; }
         }
     </script>
 </body>
-</html>                                                                                                                                                   
+</html>
