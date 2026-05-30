@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Unbestechlicher Wächter Pro (V2)</title>
+    <title>CornerTime - Unbestechlicher Wächter Pro (Final)</title>
     <style>
         body { 
             background-color: #121212; color: #fff; 
@@ -52,7 +52,6 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- SCREEN 1: CONFIGURATION -->
         <div id="setupScreen" class="setup-screen">
             <h2>Wächter Pro Setup</h2>
             
@@ -99,7 +98,6 @@
             <button class="secondary-btn" onclick="showVerificationOption()">Logfile verifizieren (Buddy-Modus)</button>
         </div>
         
-        <!-- SCREEN 2: ACTIVE WORKOUT -->
         <div id="activeScreen">
             <div id="timerDisplay" class="timer-display">00:00</div>
             <div id="status" class="status-message">Kamera initialisieren...</div>
@@ -123,7 +121,6 @@
             </div>
         </div>
 
-        <!-- SCREEN 3: UNBESTECHLICHES LOGFILE -->
         <div id="logScreen" class="log-screen">
             <h2 id="logTitle">Workout Protokoll</h2>
             <div id="verifyBadge" class="verification-badge" style="display:none;"></div>
@@ -153,7 +150,7 @@
             'left_elbow': 'Linker Ellbogen', 'right_elbow': 'Rechter Ellbogen',
             'left_wrist': 'Linkes Handgelenk', 'right_wrist': 'Rechtes Handgelenk',
             'left_hip': 'Linke Hüfte', 'right_hip': 'Rechte Hüfte',
-            'left_knee': 'Linkes Knie', 'right_knee': 'Rechte Knie',
+            'left_knee': 'Linkes Knie', 'right_knee': 'Rechtes Knie',
             'left_heel': 'Linke Ferse', 'right_heel': 'Rechte Ferse'
         };
 
@@ -166,6 +163,7 @@
         
         let logEvents = [];
         let startTimeStr = "", initialTargetDuration = 0, totalPenaltiesCount = 0, totalPenaltySecondsSum = 0;
+        let realStartTimestamp = 0, lastCheckpointTimestamp = 0;
 
         function speak(text, force = false) {
             try {
@@ -275,10 +273,10 @@
                 if (!f('left_elbow') || !f('right_elbow')) return { valid: false, msg: "Arme hinten verschränken" };
                 if (Math.abs(latestKeypoints.left_elbow.x - latestKeypoints.right_elbow.x) > 0.95 * sb) return { valid: false, msg: "Gegenseitig Ellbogen greifen" };
             }
-            if (selArm === "RUECKEN_PO") {
+             if (selArm === "RUECKEN_PO") {
                 if (!f('left_wrist') || !f('right_wrist') || !f('left_hip') || !f('right_hip')) return { valid: false, msg: "Hände hinten tief" };
-                const hipY = (latestKeypoints.left_wrist.y - (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2);
-                if (Math.abs(latestKeypoints.left_wrist.y - ((latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2)) > 0.4 * sb || Math.abs(latestKeypoints.right_wrist.y - ((latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2)) > 0.4 * sb) return { valid: false, msg: "Hände flach auf Gesäß legen" };
+                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
+                if (Math.abs(latestKeypoints.left_wrist.y - hipY) > 0.4 * sb || Math.abs(latestKeypoints.right_wrist.y - hipY) > 0.4 * sb) return { valid: false, msg: "Hände flach auf Gesäß legen" };
             }
 
             return { valid: true, msg: "Überwachung aktiv! 🟢" };
@@ -297,6 +295,9 @@
 
             document.getElementById('setupScreen').style.display = 'none';
             document.getElementById('activeScreen').style.display = 'block';
+            
+            timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD;
+            initialTargetDuration = timeRemainingSeconds;
             updateTimerUI();
             
             try {
@@ -331,12 +332,8 @@
         }
 
         function initWorkout() {
-            // FIX: Startzeitpunkt ERST JETZT nach Ablauf des Countdowns stempeln
-            startTimeStr = new Date().toLocaleString('de-DE');
-            timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD;
-            initialTargetDuration = timeRemainingSeconds;
-            updateTimerUI();
-
+            realStartTimestamp = Date.now();
+            startTimeStr = new Date(realStartTimestamp).toLocaleString('de-DE');
             setNewAnchor("Wächter aktiv");
             
             workoutInterval = setInterval(() => {
@@ -362,6 +359,7 @@
             trackingList.forEach(j => { if (f(j)) anchorPose[j] = { x: latestKeypoints[j].x, y: latestKeypoints[j].y }; });
             
             isPrepared = true; isGracePeriodActive = false; errorCounter = 0; remainingSecondsCounter = 3;
+            lastCheckpointTimestamp = Date.now(); // Immunität starten
             status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333";
             if (audioMessage) speak(audioMessage, true);
         }
@@ -397,6 +395,7 @@
         }
 
         async function checkRules() {
+            if (Date.now() - lastCheckpointTimestamp < 2000) return; // 2s Immunitätsschutz nach Checkpoint
             if (!detector || !isPrepared || appEnded) return;
             
             if (isGracePeriodActive) {
@@ -411,7 +410,6 @@
                         logEvents.push(`[${timeStamp}] CHECKPOINT: Position erfolgreich wiederhergestellt.`);
                         setNewAnchor("Checkpoint"); 
                     } else {
-                        // --- DETAIL-CHECK NACH 3 SEKUNDEN ---
                         let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
                         timeRemainingSeconds += penalty; totalPenaltiesCount++; totalPenaltySecondsSum += penalty;
                         updateTimerUI();
@@ -436,7 +434,7 @@
                     const dist = Math.sqrt(Math.pow(latestKeypoints[joint].x - anchorPose[joint].x, 2) + Math.pow(latestKeypoints[joint].y - anchorPose[joint].y, 2));
                     if (dist > allowedDeviation) { 
                         globalDriftDetected = true; 
-                        brokenJoint = punktNamenDe[joint] || joint; // Namen des betroffenen Gelenks merken
+                        brokenJoint = punktNamenDe[joint] || joint;
                         break; 
                     }
                 }
@@ -462,11 +460,11 @@
             clearInterval(workoutInterval); clearInterval(ruleCheckInterval);
             isPrepared = false; if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
             
-            const endTimeStr = new Date().toLocaleString('de-DE');
+            const endTimestamp = Date.now();
+            const endTimeStr = new Date(endTimestamp).toLocaleString('de-DE');
             let statusText = endReason === "SUCCESS" ? "Erfolgreich beendet (Uhr auf 0)" : "MAXIMAL-DAUER ERREICHT (Deckel gegriffen)";
             
-            // FIX: Effektive Trainingszeit ist exakt die gewürfelte Zeit plus alle erlittenen Strafen
-            let realEffectiveSeconds = initialTargetDuration + totalPenaltySecondsSum;
+            let realEffectiveSeconds = Math.round((endTimestamp - realStartTimestamp) / 1000);
 
             let logText = `=== CORNERTIME WÄCHTER REPORT ===\n`;
             logText += `Position: ${selPos}\nArmhaltung: ${selArm}\nBeinhaltung: ${selLeg}\n\n`;
@@ -531,4 +529,4 @@
         }
     </script>
 </body>
-</html>
+</html>                                                                                                                                                   
