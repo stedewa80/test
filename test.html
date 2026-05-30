@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Unbestechlicher Wächter Pro</title>
+    <title>CornerTime - Unbestechlicher Wächter Pro (REPAIRED)</title>
     <style>
         body { 
             background-color: #121212; color: #fff; 
@@ -28,7 +28,6 @@
         .camera-box { width: 100%; border-radius: 20px; border: 8px solid #333333; overflow: hidden; background: #000; position: relative; aspect-ratio: 1 / 1; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         canvas#processingCanvas { display: block; width: 100%; height: 100%; object-fit: cover; }
         
-        /* Fixpunkt-Indikatoren */
         .joint-indicator { position: absolute; width: 18px; height: 18px; border-radius: 50%; pointer-events: none; display: none; z-index: 9999; transform: translate(-50%, -50%); box-shadow: 0 0 6px rgba(0,0,0,0.9); }
         #ptHead { border: 3px solid #00ffcc; background: rgba(0,255,204,0.4); }
         #ptLShoulder, #ptRShoulder { border: 3px solid #28a745; background: rgba(40,167,69,0.4); }
@@ -80,9 +79,9 @@
             
             <h3>Dauer (Zufallsbereich in Sek.)</h3>
             <div class="row">
-                <div class="col"><label>Min (Sek)</label><input type="number" id="minDuration" class="custom-input" value="300"></div>
-                <div class="col"><label>Max (Sek)</label><input type="number" id="maxDuration" class="custom-input" value="360"></div>
-                <div class="col"><label>Max-Deckel (Sek)</label><input type="number" id="capDuration" class="custom-input" value="480"></div>
+                <div class="col"><label>Min (Sek)</label><input type="number" id="minDuration" class="custom-input" value="30"></div>
+                <div class="col"><label>Max (Sek)</label><input type="number" id="maxDuration" class="custom-input" value="45"></div>
+                <div class="col"><label>Max-Deckel (Sek)</label><input type="number" id="capDuration" class="custom-input" value="120"></div>
             </div>
 
             <h3>Strafe pro Vorfall (Zufall in Sek.)</h3>
@@ -93,7 +92,7 @@
 
             <h3>Buddy Fälschungsschutz</h3>
             <label>Gemeinsames Geheimwort (Salt)</label>
-            <input type="text" id="secretSalt" class="custom-input" value="schweinehundbezwingen2026" placeholder="Euer geheimes Passwort">
+            <input type="text" id="secretSalt" class="custom-input" value="schweinehundbezwingen2026">
             
             <button class="start-btn" onclick="startApp()">WÄCHTER AKTIVIEREN</button>
             <button class="secondary-btn" onclick="showVerificationOption()">Logfile verifizieren (Buddy-Modus)</button>
@@ -125,7 +124,7 @@
         <div id="logScreen" class="log-screen">
             <h2 id="logTitle">Workout Protokoll</h2>
             <div id="verifyBadge" class="verification-badge" style="display:none;"></div>
-            <p style="font-size:0.85rem; color:#aaa; margin-bottom:10px;">Kopiere den gesamten unteren Block und schicke ihn deinem Accountability Buddy:</p>
+            <p style="font-size:0.85rem; color:#aaa; margin-bottom:10px;">Kopiere den gesamten unteren Block für deinen Buddy:</p>
             <textarea id="logOutput" class="log-output" readonly></textarea>
             <div id="buddyVerifyBox" style="display:none; margin-top:15px;">
                 <button class="start-btn" style="margin-top:0;" onclick="verifyPastedLog()">LOG JETZT PRÜFEN</button>
@@ -146,12 +145,12 @@
         };
 
         let selPos = "", selArm = "", selLeg = "";
-        let minD = 300, maxD = 360, capD = 480, minP = 5, maxP = 10, salt = "";
+        let minD = 30, maxD = 45, capD = 120, minP = 5, maxP = 10, salt = "";
         let detector = null, anchorPose = {}, isPrepared = false, latestKeypoints = {}, baseShoulderWidth = 100, wakeLock = null;
-        let timeRemainingSeconds = 300, totalTimeElapsed = 0, workoutInterval = null, isGracePeriodActive = false, errorCounter = 0, remainingSecondsCounter = 3;
+        let timeRemainingSeconds = 30, totalTimeElapsed = 0, workoutInterval = null, ruleCheckInterval = null;
+        let isGracePeriodActive = false, errorCounter = 0, remainingSecondsCounter = 3, appEnded = false;
         let lastSpokenError = "", lastSpokenErrorTime = 0;
         
-        // Logdaten-Sammler
         let logEvents = [];
         let startTimeStr = "", initialTargetDuration = 0, totalPenaltiesCount = 0, totalPenaltySecondsSum = 0;
 
@@ -160,7 +159,7 @@
                 if (force) { window.speechSynthesis.cancel(); }
                 const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'de-DE'; utterance.rate = 1.1;
                 window.speechSynthesis.speak(utterance);
-            } catch (e) { console.log("Audiofehler:", e); }
+            } catch (e) { }
         }
 
         function speakErrorSmart(errorMessage) {
@@ -182,7 +181,6 @@
 
         function f(part) { return latestKeypoints[part] && latestKeypoints[part].score > 0.4; }
 
-        // --- CRYPTO SIGNATUR (SHA-256) ---
         async function generateHMAC(text, secret) {
             const encoder = new TextEncoder();
             const keyData = encoder.encode(secret);
@@ -192,7 +190,6 @@
             return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
-        // --- MODULARE BIOMECHANIK-VALIDIERUNG ---
         function validateHaltung() {
             if (!f('left_shoulder') || !f('right_shoulder')) return { valid: false, msg: "Körper nicht im Bild" };
             
@@ -285,7 +282,6 @@
             maxP = parseInt(document.getElementById('maxPenalty').value);
             salt = document.getElementById('secretSalt').value;
 
-            // Dauer auswürfeln
             timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD;
             initialTargetDuration = timeRemainingSeconds;
             startTimeStr = new Date().toLocaleString('de-DE');
@@ -309,24 +305,16 @@
                     status.innerText = "In Position gehen! (5s)"; status.style.color = "#ffaa00"; speak("In Position gehen", true);
                     loop();
                     
-                    setTimeout(async () => {
-                        const poses = await detector.estimatePoses(canvas);
-                        if (poses && poses.length > 0) {
-                            poses[0].keypoints.forEach(k => latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score });
-                            let result = validateHaltung();
-                            if (result.valid) { initWorkout(); } 
-                            else {
-                                status.innerText = result.msg; status.style.color = "#ff3333"; speakErrorSmart(result.msg);
-                                let retryAnchor = setInterval(async () => {
-                                    const p = await detector.estimatePoses(canvas);
-                                    if(p && p.length > 0) {
-                                        p[0].keypoints.forEach(k => latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score });
-                                        let check = validateHaltung();
-                                        if (check.valid) { initWorkout(); clearInterval(retryAnchor); }
-                                        else { status.innerText = check.msg; speakErrorSmart(check.msg); }
-                                    }
-                                }, 1000);
-                            }
+                    setTimeout(() => {
+                        let result = validateHaltung();
+                        if (result.valid) { initWorkout(); } 
+                        else {
+                            status.innerText = result.msg; status.style.color = "#ff3333"; speakErrorSmart(result.msg);
+                            let retryAnchor = setInterval(() => {
+                                let check = validateHaltung();
+                                if (check.valid) { initWorkout(); clearInterval(retryAnchor); }
+                                else { status.innerText = check.msg; speakErrorSmart(check.msg); }
+                            }, 1000);
                         }
                     }, 5000);
                 };
@@ -336,19 +324,17 @@
         function initWorkout() {
             setNewAnchor("Wächter aktiv");
             workoutInterval = setInterval(() => {
-                if (isPrepared) {
+                if (isPrepared && !appEnded) {
                     totalTimeElapsed++;
                     if (!isGracePeriodActive) {
                         timeRemainingSeconds--; updateTimerUI();
                     }
-                    
-                    // Prüfung auf Maximal-Deckel
                     if (totalTimeElapsed >= capD || timeRemainingSeconds <= 0) {
                         endWorkout(totalTimeElapsed >= capD ? "CAP_REACHED" : "SUCCESS");
                     }
                 }
             }, 1000);
-            setInterval(checkRules, 1000);
+            ruleCheckInterval = setInterval(checkRules, 1000);
         }
 
         function setNewAnchor(audioMessage) {
@@ -356,7 +342,6 @@
             if (f('left_shoulder') && f('right_shoulder')) {
                 baseShoulderWidth = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
             }
-            
             const trackingList = ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_hip', 'right_hip', 'left_knee', 'right_knee', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist', 'left_heel', 'right_heel'];
             trackingList.forEach(j => { if (f(j)) anchorPose[j] = { x: latestKeypoints[j].x, y: latestKeypoints[j].y }; });
             
@@ -365,13 +350,21 @@
             if (audioMessage) speak(audioMessage, true);
         }
 
-        function loop() {
+        async function loop() {
+            if (appEnded) return;
             canvas.width = 257; canvas.height = 257;
             const minDim = Math.min(video.videoWidth, video.videoHeight || 480);
             ctx.save(); ctx.translate(257, 0); ctx.scale(-1, 1);
             ctx.drawImage(video, (video.videoWidth - minDim) / 2, (video.videoHeight - minDim) / 2, minDim, minDim, 0, 0, 257, 257); ctx.restore();
             
-            // INDIKATOREN LAUFEN JETZT PERMANENT AB SEKUNDE 1 FÜR ALLE ERFASSTEN PUNKTE
+            // HOCHFREQUENTES TRACKING DIREKT IM FRAME-LOOP FÜR PUNKTANZEIGE AB SEKUNDE 1
+            if (detector && video.readyState >= 2) {
+                const poses = await detector.estimatePoses(canvas);
+                if (poses && poses.length > 0) {
+                    poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; });
+                }
+            }
+
             const drawPoint = (el, part) => { 
                 if (f(part)) { 
                     el.style.left = `${(latestKeypoints[part].x / 257) * container.clientWidth}px`; el.style.top = `${(latestKeypoints[part].y / 257) * container.clientHeight}px`; el.style.display = 'block'; 
@@ -389,12 +382,35 @@
         }
 
         async function checkRules() {
-            if (!detector || video.readyState < 2 || !isPrepared) return;
-            const poses = await detector.estimatePoses(canvas);
+            if (!detector || !isPrepared || appEnded) return;
             
-            if (!poses || poses.length === 0) { return; }
-            latestKeypoints = {};
-            poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; });
+            // Wenn das Korrekturfenster aktiv ist, übernimmt der Countdown die Kontrolle (keine Drift-Prüfung!)
+            if (isGracePeriodActive) {
+                if (remainingSecondsCounter > 0) {
+                    status.innerText = `KORREKTURZEIT! Noch ${remainingSecondsCounter}s... ⏳`;
+                    status.style.color = "#ffaa00"; timerDisplay.style.color = "#ffaa00"; container.style.borderColor = "#ffaa00";
+                    speak(remainingSecondsCounter.toString(), true); remainingSecondsCounter--;
+                } else {
+                    let check = validateHaltung();
+                    if (check.valid) { 
+                        const timeStamp = new Date().toLocaleTimeString('de-DE');
+                        logEvents.push(`[${timeStamp}] CHECKPOINT: Position erfolgreich wiederhergestellt.`);
+                        setNewAnchor("Checkpoint"); 
+                    } else {
+                        let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
+                        timeRemainingSeconds += penalty; totalPenaltiesCount++; totalPenaltySecondsSum += penalty;
+                        updateTimerUI();
+                        
+                        const timeStamp = new Date().toLocaleTimeString('de-DE');
+                        logEvents.push(`[${timeStamp}] ESKALATION: Haltung nach 3s immer noch falsch! -> FOLGE-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
+                        
+                        speak(`${check.msg}. Strafe plus ${penalty} Sekunden`, true);
+                        status.innerText = `${check.msg.toUpperCase()}! +${penalty}s! ⏳`;
+                        status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; remainingSecondsCounter = 3;
+                    }
+                }
+                return;
+            }
 
             let globalDriftDetected = false;
             const allowedDeviation = 0.14 * baseShoulderWidth;
@@ -407,63 +423,29 @@
             }
 
             if (globalDriftDetected) {
-                errorCounter++;
-                if (errorCounter >= 2 || isGracePeriodActive) {
-                    let check = validateHaltung();
-                    
-                    // --- REVOLUTION: SOFORT-STRAFE BEIM ERSTEN DRIFT-VORFALL ---
-                    if (!isGracePeriodActive) { 
-                        isGracePeriodActive = true; 
-                        remainingSecondsCounter = 3; 
-                        
-                        let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
-                        timeRemainingSeconds += penalty; totalPenaltiesCount++; totalPenaltySecondsSum += penalty;
-                        updateTimerUI();
-                        
-                        const timeStamp = new Date().toLocaleTimeString('de-DE');
-                        logEvents.push(`[${timeStamp}] DRIFT: ${check.msg} -> SOFORT-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
-                        
-                        speak(`Bewegung erkannt. Plus ${penalty} Sekunden. Haltung korrigieren.`, true); 
-                    }
-                    
-                    if (remainingSecondsCounter > 0) {
-                        status.innerText = `KORREKTURZEIT! Noch ${remainingSecondsCounter}s... ⏳`;
-                        status.style.color = "#ffaa00"; timerDisplay.style.color = "#ffaa00"; container.style.borderColor = "#ffaa00";
-                        speak(remainingSecondsCounter.toString()); remainingSecondsCounter--;
-                    } else {
-                        // Nach Ablauf der 3s entscheidet die harte Biomechanik
-                        if (check.valid) { 
-                            const timeStamp = new Date().toLocaleTimeString('de-DE');
-                            logEvents.push(`[${timeStamp}] CHECKPOINT: Position erfolgreich wiederhergestellt.`);
-                            setNewAnchor("Checkpoint"); 
-                        } else {
-                            // ESKALATION: Immer noch falsch! Sofort nächste Strafe drauf!
-                            let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
-                            timeRemainingSeconds += penalty; totalPenaltiesCount++; totalPenaltySecondsSum += penalty;
-                            updateTimerUI();
-                            
-                            const timeStamp = new Date().toLocaleTimeString('de-DE');
-                            logEvents.push(`[${timeStamp}] ESKALATION: Haltung nach 3s immer noch falsch! -> FOLGE-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
-                            
-                            speak(`${check.msg}. Strafe plus ${penalty} Sekunden`, true);
-                            status.innerText = `${check.msg.toUpperCase()}! +${penalty}s! ⏳`;
-                            status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; remainingSecondsCounter = 3;
-                        }
-                    }
-                }
-            } else { 
-                errorCounter = 0; isGracePeriodActive = false;
-                status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333"; 
+                let check = validateHaltung();
+                isGracePeriodActive = true; 
+                remainingSecondsCounter = 3; 
+                
+                let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
+                timeRemainingSeconds += penalty; totalPenaltiesCount++; totalPenaltySecondsSum += penalty;
+                updateTimerUI();
+                
+                const timeStamp = new Date().toLocaleTimeString('de-DE');
+                logEvents.push(`[${timeStamp}] DRIFT: ${check.msg} -> SOFORT-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
+                
+                speak(`Bewegung erkannt. Plus ${penalty} Sekunden. Haltung korrigieren.`, true); 
             }
         }
 
         async function endWorkout(endReason) {
-            clearInterval(workoutInterval); isPrepared = false; releaseWakeLock();
-            const endTimeStr = new Date().toLocaleString('de-DE');
+            appEnded = true;
+            clearInterval(workoutInterval); clearInterval(ruleCheckInterval);
+            isPrepared = false; if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
             
+            const endTimeStr = new Date().toLocaleString('de-DE');
             let statusText = endReason === "SUCCESS" ? "Erfolgreich beendet (Uhr auf 0)" : "MAXIMAL-DAUER ERREICHT (Deckel gegriffen)";
             
-            // Logfile Text generieren
             let logText = `=== CORNERTIME WÄCHTER REPORT ===\n`;
             logText += `Position: ${selPos}\nArmhaltung: ${selArm}\nBeinhaltung: ${selLeg}\n\n`;
             logText += `GEPLANTE DAUER: ${formatTime(initialTargetDuration)} (Bereich: ${minD}-${maxD}s)\n`;
@@ -479,23 +461,17 @@
             logText += `Gesamte Strafzeit:  +${totalPenaltySecondsSum} Sekunden\n`;
             logText += `=================================\n`;
             
-            // FÄLSCHUNGSSCHUTZ-SIGNATUR ERZEUGEN
             const hash = await generateHMAC(logText, salt);
             logText += `SIGNATUR: ${hash}\n`;
 
-            // UI umschalten
             document.getElementById('activeScreen').style.display = 'none';
             document.getElementById('logScreen').style.display = 'block';
             document.getElementById('logOutput').value = logText;
             
-            if(endReason === "SUCCESS") {
-                speak("Training beendet. Ausgezeichnet.", true);
-            } else {
-                speak("Maximalzeit erreicht. Abbruch.", true);
-            }
+            if(endReason === "SUCCESS") { speak("Training beendet. Ausgezeichnet.", true); }
+            else { speak("Maximalzeit erreicht. Abbruch.", true); }
         }
 
-        // --- ACCOUNTABILITY BUDDY MODUS (VERIFIKATION) ---
         function showVerificationOption() {
             document.getElementById('setupScreen').style.display = 'none';
             document.getElementById('logScreen').style.display = 'block';
@@ -519,8 +495,6 @@
                     badge.className = "verification-badge badge-error"; badge.innerText = "❌ UNGÜLTIG: Keine Signatur gefunden!"; return;
                 }
                 const providedSignature = lines[sigLineIndex].replace('SIGNATUR: ', '').trim();
-                
-                // Text ohne die Signaturzeile wieder zusammenbauen
                 let textToVerify = lines.slice(0, sigLineIndex).join('\n') + '\n';
                 const computedSignature = await generateHMAC(textToVerify, saltCheck);
 
