@@ -3,82 +3,536 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CornerTime - Profil Diagnose</title>
+    <title>CornerTime - Unbestechlicher Wächter Pro</title>
     <style>
-        body { background: #121212; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .container { text-align: center; max-width: 500px; width: 100%; padding: 20px; }
-        .video-box { width: 100%; aspect-ratio: 1/1; background: #000; border: 4px solid #333; border-radius: 15px; position: relative; overflow: hidden; }
-        canvas { display: block; width: 100%; height: 100%; object-fit: cover; }
-        .data-box { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-top: 15px; text-align: left; font-family: monospace; font-size: 1.1rem; }
-        .data-row { display: flex; justify-content: space-between; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #333; }
-        .dot { position: absolute; width: 20px; height: 20px; border-radius: 50%; transform: translate(-50%, -50%); display: none; z-index: 10; border: 3px solid white; }
+        body { 
+            background-color: #121212; color: #fff; 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            display: flex; flex-direction: column; align-items: center; 
+            justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; 
+        }
+        .app-container { width: 100%; max-width: 440px; text-align: center; }
+        .setup-screen, .log-screen { background: #1e1e1e; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: left; }
+        h2 { text-align: center; color: #00ffcc; margin-top: 0; margin-bottom: 20px; }
+        h3 { font-size: 0.9rem; color: #aaa; text-transform: uppercase; margin-top: 15px; margin-bottom: 8px; letter-spacing: 1px; }
+        .row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .col { flex: 1; display: flex; flex-direction: column; }
+        label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+        .custom-select, .custom-input { width: 100%; background: #2a2a2a; color: #fff; border: 2px solid #007aff; padding: 10px; border-radius: 10px; font-size: 1rem; font-weight: bold; outline: none; box-sizing: border-box; }
+        .custom-input { border-color: #555; font-variant-numeric: tabular-nums; }
+        .custom-input:focus { border-color: #00ffcc; }
+        
+        .timer-display { font-size: 3.5rem; font-weight: 800; margin-bottom: 5px; font-variant-numeric: tabular-nums; text-align: center; }
+        #activeScreen, #logScreen { display: none; width: 100%; }
+        .status-message { font-size: 1.1rem; font-weight: bold; margin-bottom: 15px; min-height: 2.5rem; color: #00ffcc; text-align: center; }
+        .camera-box { width: 100%; border-radius: 20px; border: 8px solid #333333; overflow: hidden; background: #000; position: relative; aspect-ratio: 1 / 1; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        canvas#processingCanvas { display: block; width: 100%; height: 100%; object-fit: cover; }
+        
+        /* Fixpunkt-Indikatoren */
+        .joint-indicator { position: absolute; width: 18px; height: 18px; border-radius: 50%; pointer-events: none; display: none; z-index: 9999; transform: translate(-50%, -50%); box-shadow: 0 0 6px rgba(0,0,0,0.9); }
+        #ptHead { border: 3px solid #00ffcc; background: rgba(0,255,204,0.4); }
+        #ptLShoulder, #ptRShoulder { border: 3px solid #28a745; background: rgba(40,167,69,0.4); }
+        #ptLWrist, #ptRWrist { border: 3px solid #3399ff; background: rgba(51,153,255,0.4); }
+        #ptLElbow, #ptRElbow { border: 3px solid #ff00ff; background: rgba(255,0,255,0.4); }
+        #ptLHip, #ptRHip { border: 3px solid #ffaa00; background: rgba(255,170,0,0.4); }
+        #ptLKnee, #ptRKnee { border: 3px solid #ffea00; background: rgba(255,234,0,0.4); }
+        #ptLHeel, #ptRHeel { border: 3px solid #ff3333; background: rgba(255,51,51,0.4); }
+        
+        button.start-btn { background: #007aff; color: white; border: none; padding: 16px; font-size: 1.2rem; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 20px; width: 100%; box-shadow: 0 4px 10px rgba(0,122,255,0.3); }
+        button.secondary-btn { background: #333; color: #fff; border: 1px solid #555; padding: 12px; font-size: 1rem; border-radius: 10px; cursor: pointer; width: 100%; margin-top: 10px; }
+        textarea.log-output { width: 100%; height: 250px; background: #111; color: #00ffcc; border: 1px solid #333; font-family: monospace; font-size: 0.85rem; padding: 10px; border-radius: 10px; box-sizing: border-box; resize: none; }
+        .verification-badge { padding: 12px; border-radius: 10px; font-weight: bold; text-align: center; margin-top: 10px; }
+        .badge-success { background: rgba(40,167,69,0.2); color: #28a745; border: 1px solid #28a745; }
+        .badge-error { background: rgba(220,53,69,0.2); color: #dc3545; border: 1px solid #dc3545; }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.20.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.20.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3"></script>
 </head>
 <body>
-    <div class="container">
-        <h3>Profil-Diagnose (Seitliche Ansicht)</h3>
-        <div class="video-box" id="box">
-            <video id="webcam" autoplay playsinline muted style="display:none;"></video>
-            <canvas id="canvas"></canvas>
-            <div id="dotS" class="dot" style="background: #ff3333;"></div>
-            <div id="dotH" class="dot" style="background: #33ff33;"></div>
-            <div id="dotK" class="dot" style="background: #3333ff;"></div>
+    <div class="app-container">
+        <div id="setupScreen" class="setup-screen">
+            <h2>Wächter Pro Setup</h2>
+            
+            <h3>Haltungs-Matrix</h3>
+            <select id="positionSelect" class="custom-select">
+                <option value="STEHEND">Stehend</option>
+                <option value="KNIEND_AUFRECHT">Kniend - aufrecht</option>
+                <option value="KNIEND_SITZEND">Kniend - auf Fersen sitzend</option>
+                <option value="KNIEND_VORGEBEUGT">Kniend - nach vorne gebeugt</option>
+            </select>
+            <select id="armSelect" class="custom-select">
+                <option value="UEBER_KOPF">Gerade über dem Kopf</option>
+                <option value="AUF_KOPF">Auf dem Kopf (Hände auf Scheitel)</option>
+                <option value="HINTER_KOPF">Hinter dem Kopf (Verschränkt)</option>
+                <option value="DREIZACK">Seitlich neben dem Kopf (Dreizack)</option>
+                <option value="RUECKEN_ELLBOGEN">Hinter dem Rücken (greifen Ellbogen)</option>
+                <option value="RUECKEN_PO">Hinter dem Rücken (ruhen auf Po)</option>
+                <option value="IGNORIEREN">Nicht sichtbar / Ignorieren</option>
+            </select>
+            <select id="legSelect" class="custom-select">
+                <option value="ZUSAMMEN">Beine zusammen</option>
+                <option value="GESPREIZT">Beine gespreizt</option>
+                <option value="IGNORIEREN">Nicht sichtbar / Ignorieren</option>
+            </select>
+            
+            <h3>Dauer (Zufallsbereich in Sek.)</h3>
+            <div class="row">
+                <div class="col"><label>Min (Sek)</label><input type="number" id="minDuration" class="custom-input" value="300"></div>
+                <div class="col"><label>Max (Sek)</label><input type="number" id="maxDuration" class="custom-input" value="360"></div>
+                <div class="col"><label>Max-Deckel (Sek)</label><input type="number" id="capDuration" class="custom-input" value="480"></div>
+            </div>
+
+            <h3>Strafe pro Vorfall (Zufall in Sek.)</h3>
+            <div class="row">
+                <div class="col"><label>Min Strafe</label><input type="number" id="minPenalty" class="custom-input" value="5"></div>
+                <div class="col"><label>Max Strafe</label><input type="number" id="maxPenalty" class="custom-input" value="10"></div>
+            </div>
+
+            <h3>Buddy Fälschungsschutz</h3>
+            <label>Gemeinsames Geheimwort (Salt)</label>
+            <input type="text" id="secretSalt" class="custom-input" value="schweinehundbezwingen2026" placeholder="Euer geheimes Passwort">
+            
+            <button class="start-btn" onclick="startApp()">WÄCHTER AKTIVIEREN</button>
+            <button class="secondary-btn" onclick="showVerificationOption()">Logfile verifizieren (Buddy-Modus)</button>
         </div>
-        <div class="data-box">
-            <div class="data-row" style="color:#ff3333;"><span>Schulter (Rot):</span><span id="valS">Sucht...</span></div>
-            <div class="data-row" style="color:#33ff33;"><span>Hüfte (Grün):</span><span id="valH">Sucht...</span></div>
-            <div class="data-row" style="color:#3333ff;"><span>Knie (Blau):</span><span id="valK">Sucht...</span></div>
+        
+        <div id="activeScreen">
+            <div id="timerDisplay" class="timer-display">00:00</div>
+            <div id="status" class="status-message">Kamera initialisieren...</div>
+            <div class="camera-box" id="camContainer">
+                <video id="webcam" autoplay playsinline muted style="display:none;"></video>
+                <canvas id="processingCanvas"></canvas>
+                
+                <div id="ptHead" class="joint-indicator"></div>
+                <div id="ptLShoulder" class="joint-indicator"></div>
+                <div id="ptRShoulder" class="joint-indicator"></div>
+                <div id="ptLWrist" class="joint-indicator"></div>
+                <div id="ptRWrist" class="joint-indicator"></div>
+                <div id="ptLElbow" class="joint-indicator"></div>
+                <div id="ptRElbow" class="joint-indicator"></div>
+                <div id="ptLHip" class="joint-indicator"></div>
+                <div id="ptRHip" class="joint-indicator"></div>
+                <div id="ptLKnee" class="joint-indicator"></div>
+                <div id="ptRKnee" class="joint-indicator"></div>
+                <div id="ptLHeel" class="joint-indicator"></div>
+                <div id="ptRHeel" class="joint-indicator"></div>
+            </div>
+        </div>
+
+        <div id="logScreen" class="log-screen">
+            <h2 id="logTitle">Workout Protokoll</h2>
+            <div id="verifyBadge" class="verification-badge" style="display:none;"></div>
+            <p style="font-size:0.85rem; color:#aaa; margin-bottom:10px;">Kopiere den gesamten unteren Block und schicke ihn deinem Accountability Buddy:</p>
+            <textarea id="logOutput" class="log-output" readonly></textarea>
+            <div id="buddyVerifyBox" style="display:none; margin-top:15px;">
+                <button class="start-btn" style="margin-top:0;" onclick="verifyPastedLog()">LOG JETZT PRÜFEN</button>
+            </div>
+            <button class="secondary-btn" onclick="location.reload()">Zurück zum Hauptmenü</button>
         </div>
     </div>
-    <script>
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const box = document.getElementById('box');
-        const dS = document.getElementById('dotS'), dH = document.getElementById('dotH'), dK = document.getElementById('dotK');
-        const vS = document.getElementById('valS'), vH = document.getElementById('valH'), vK = document.getElementById('valK');
-        let net = null;
 
-        async function init() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 } });
-            video.srcObject = stream;
-            video.onloadedmetadata = async () => {
-                net = await posenet.load({ architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.50 });
-                loop();
-                setInterval(track, 200);
-            };
+    <script>
+        const video = document.getElementById('webcam'), canvas = document.getElementById('processingCanvas'), ctx = canvas.getContext('2d');
+        const container = document.getElementById('camContainer'), status = document.getElementById('status'), timerDisplay = document.getElementById('timerDisplay');
+        
+        const pts = { 
+            head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), 
+            lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist'), lE: document.getElementById('ptLElbow'), 
+            rE: document.getElementById('ptRElbow'), lH: document.getElementById('ptLHip'), rH: document.getElementById('ptRHip'),
+            lK: document.getElementById('ptLKnee'), rK: document.getElementById('ptRKnee'), lF: document.getElementById('ptLHeel'), rF: document.getElementById('ptRHeel')
+        };
+
+        let selPos = "", selArm = "", selLeg = "";
+        let minD = 300, maxD = 360, capD = 480, minP = 5, maxP = 10, salt = "";
+        let detector = null, anchorPose = {}, isPrepared = false, latestKeypoints = {}, baseShoulderWidth = 100, wakeLock = null;
+        let timeRemainingSeconds = 300, totalTimeElapsed = 0, workoutInterval = null, isGracePeriodActive = false, errorCounter = 0, remainingSecondsCounter = 3;
+        let lastSpokenError = "", lastSpokenErrorTime = 0;
+        
+        // Logdaten-Sammler
+        let logEvents = [];
+        let startTimeStr = "", initialTargetDuration = 0, totalPenaltiesCount = 0, totalPenaltySecondsSum = 0;
+
+        function speak(text, force = false) {
+            try {
+                if (force) { window.speechSynthesis.cancel(); }
+                const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'de-DE'; utterance.rate = 1.1;
+                window.speechSynthesis.speak(utterance);
+            } catch (e) { console.log("Audiofehler:", e); }
+        }
+
+        function speakErrorSmart(errorMessage) {
+            const now = Date.now();
+            if (errorMessage !== lastSpokenError || (now - lastSpokenErrorTime) > 3000) {
+                speak(errorMessage, true); lastSpokenError = errorMessage; lastSpokenErrorTime = now;
+            }
+        }
+
+        function formatTime(totalSeconds) {
+            const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+            const secs = (totalSeconds % 60).toString().padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+
+        function updateTimerUI() {
+            timerDisplay.innerText = formatTime(timeRemainingSeconds);
+        }
+
+        function f(part) { return latestKeypoints[part] && latestKeypoints[part].score > 0.4; }
+
+        // --- CRYPTO SIGNATUR (SHA-256) ---
+        async function generateHMAC(text, secret) {
+            const encoder = new TextEncoder();
+            const keyData = encoder.encode(secret);
+            const msgData = encoder.encode(text);
+            const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+            const signature = await crypto.subtle.sign('HMAC', cryptoKey, msgData);
+            return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // --- MODULARE BIOMECHANIK-VALIDIERUNG ---
+        function validateHaltung() {
+            if (!f('left_shoulder') || !f('right_shoulder')) return { valid: false, msg: "Körper nicht im Bild" };
+            
+            const sb = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
+            const headY = (f('left_ear') && f('right_ear')) ? (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2 : (latestKeypoints.left_eye && latestKeypoints.right_eye ? (latestKeypoints.left_eye.y + latestKeypoints.right_eye.y)/2 : 0);
+            const shoulderY = (latestKeypoints.left_shoulder.y + latestKeypoints.right_shoulder.y) / 2;
+            
+            if (selPos === "STEHEND") {
+                if (!f('left_hip') || !f('right_hip') || !f('left_heel') || !f('right_heel')) {
+                    if (headY === 0 || headY > shoulderY || (shoulderY - headY) < 0.3 * sb) return { valid: false, msg: "Bitte gerade stehen" };
+                } else {
+                    const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
+                    const heelY = (latestKeypoints.left_heel.y + latestKeypoints.right_heel.y) / 2;
+                    if ((heelY - hipY) <= 2.0 * sb) return { valid: false, msg: "Bitte Beine strecken" };
+                }
+            }
+            if (selPos === "KNIEND_AUFRECHT") {
+                if (!f('left_hip') || !f('right_hip') || !f('left_heel') || !f('right_heel')) return { valid: false, msg: "Unterkörper nicht sichtbar" };
+                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
+                const heelY = (latestKeypoints.left_heel.y + latestKeypoints.right_heel.y) / 2;
+                if ((heelY - hipY) < 1.1 * sb || (heelY - hipY) > 1.8 * sb) return { valid: false, msg: "Bitte aufrecht knien" };
+            }
+            if (selPos === "KNIEND_SITZEND") {
+                if (!f('left_hip') || !f('right_hip') || !f('left_heel') || !f('right_heel')) return { valid: false, msg: "Unterkörper nicht sichtbar" };
+                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
+                const heelY = (latestKeypoints.left_heel.y + latestKeypoints.right_heel.y) / 2;
+                if ((heelY - hipY) >= 0.7 * sb) return { valid: false, msg: "Bitte auf Fersen setzen" };
+            }
+            if (selPos === "KNIEND_VORGEBEUGT") {
+                if (f('left_hip') && f('right_hip')) {
+                    const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
+                    if (shoulderY < hipY) return { valid: false, msg: "Bitte nach vorne beugen" };
+                } else {
+                    if (headY !== 0 && (shoulderY - headY) > 0.4 * sb) return { valid: false, msg: "Bitte tiefer beugen" };
+                }
+            }
+
+            if (selLeg === "ZUSAMMEN") {
+                let legDistance = 0, hasPoints = false;
+                if (f('left_knee') && f('right_knee')) { legDistance = Math.abs(latestKeypoints.left_knee.x - latestKeypoints.right_knee.x); hasPoints = true; }
+                else if (f('left_foot_index') && f('right_foot_index')) { legDistance = Math.abs(latestKeypoints.left_foot_index.x - latestKeypoints.right_foot_index.x); hasPoints = true; }
+                if (hasPoints && legDistance > 0.85 * sb) return { valid: false, msg: "Bitte Beine schließen" };
+            }
+            if (selLeg === "GESPREIZT") {
+                let legDistance = 0, hasPoints = false;
+                if (f('left_knee') && f('right_knee')) { legDistance = Math.abs(latestKeypoints.left_knee.x - latestKeypoints.right_knee.x); hasPoints = true; }
+                else if (f('left_foot_index') && f('right_foot_index')) { legDistance = Math.abs(latestKeypoints.left_foot_index.x - latestKeypoints.right_foot_index.x); hasPoints = true; }
+                if (!hasPoints || legDistance < 1.25 * sb) return { valid: false, msg: "Bitte Beine spreizen" };
+            }
+
+            if (selArm === "UEBER_KOPF") {
+                if (!f('left_wrist') || !f('right_wrist') || headY === 0) return { valid: false, msg: "Hände nicht sichtbar" };
+                if (latestKeypoints.left_wrist.y > headY || latestKeypoints.right_wrist.y > headY) return { valid: false, msg: "Hände gerade über Kopf" };
+            }
+            if (selArm === "AUF_KOPF") {
+                if (!f('left_wrist') || !f('right_wrist') || !f('left_elbow') || !f('right_elbow')) return { valid: false, msg: "Arme nicht sichtbar" };
+                if (Math.abs(latestKeypoints.left_wrist.y - headY) > 0.3 * sb || Math.abs(latestKeypoints.right_wrist.y - headY) > 0.3 * sb) return { valid: false, msg: "Hände auf den Kopf legen" };
+                if (Math.abs(latestKeypoints.left_elbow.x - latestKeypoints.right_elbow.x) < 1.35 * sb) return { valid: false, msg: "Ellbogen weiter nach außen" };
+            }
+            if (selArm === "HINTER_KOPF") {
+                if (!f('left_elbow') || !f('right_elbow')) return { valid: false, msg: "Ellbogen nicht sichtbar" };
+                if (Math.abs(latestKeypoints.left_elbow.x - latestKeypoints.right_elbow.x) < 1.45 * sb) return { valid: false, msg: "Ellbogen nach hinten drücken" };
+            }
+            if (selArm === "DREIZACK") {
+                if (!f('left_elbow') || !f('right_elbow') || !f('left_wrist') || !f('right_wrist')) return { valid: false, msg: "Dreizack unvollständig" };
+                if (Math.abs(latestKeypoints.left_elbow.y - shoulderY) > 0.3 * sb || Math.abs(latestKeypoints.right_elbow.y - shoulderY) > 0.3 * sb) return { valid: false, msg: "Ellbogen auf Schulterhöhe" };
+                if (latestKeypoints.left_wrist.y > latestKeypoints.left_elbow.y || latestKeypoints.right_wrist.y > latestKeypoints.right_elbow.y) return { valid: false, msg: "Unterarme senkrecht nach oben" };
+            }
+            if (selArm === "RUECKEN_ELLBOGEN") {
+                if (!f('left_elbow') || !f('right_elbow')) return { valid: false, msg: "Arme hinten verschränken" };
+                if (Math.abs(latestKeypoints.left_elbow.x - latestKeypoints.right_elbow.x) > 0.95 * sb) return { valid: false, msg: "Gegenseitig Ellbogen greifen" };
+            }
+            if (selArm === "RUECKEN_PO") {
+                if (!f('left_wrist') || !f('right_wrist') || !f('left_hip') || !f('right_hip')) return { valid: false, msg: "Hände hinten tief" };
+                const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2;
+                if (Math.abs(latestKeypoints.left_wrist.y - hipY) > 0.4 * sb || Math.abs(latestKeypoints.right_wrist.y - hipY) > 0.4 * sb) return { valid: false, msg: "Hände flach auf Gesäß legen" };
+            }
+
+            return { valid: true, msg: "Überwachung aktiv! 🟢" };
+        }
+
+        async function startApp() {
+            selPos = document.getElementById('positionSelect').value;
+            selArm = document.getElementById('armSelect').value;
+            selLeg = document.getElementById('legSelect').value;
+            minD = parseInt(document.getElementById('minDuration').value);
+            maxD = parseInt(document.getElementById('maxDuration').value);
+            capD = parseInt(document.getElementById('capDuration').value);
+            minP = parseInt(document.getElementById('minPenalty').value);
+            maxP = parseInt(document.getElementById('maxPenalty').value);
+            salt = document.getElementById('secretSalt').value;
+
+            // Dauer auswürfeln
+            timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD;
+            initialTargetDuration = timeRemainingSeconds;
+            startTimeStr = new Date().toLocaleString('de-DE');
+
+            document.getElementById('setupScreen').style.display = 'none';
+            document.getElementById('activeScreen').style.display = 'block';
+            updateTimerUI();
+            
+            try {
+                status.innerText = "Kamera-Zugriff anfordern...";
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = async () => {
+                    try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { }
+                    status.innerText = "Lade MediaPipe-Modell...";
+                    detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { 
+                        runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404' 
+                    });
+                    
+                    status.innerText = "In Position gehen! (5s)"; status.style.color = "#ffaa00"; speak("In Position gehen", true);
+                    loop();
+                    
+                    setTimeout(async () => {
+                        const poses = await detector.estimatePoses(canvas);
+                        if (poses && poses.length > 0) {
+                            poses[0].keypoints.forEach(k => latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score });
+                            let result = validateHaltung();
+                            if (result.valid) { initWorkout(); } 
+                            else {
+                                status.innerText = result.msg; status.style.color = "#ff3333"; speakErrorSmart(result.msg);
+                                let retryAnchor = setInterval(async () => {
+                                    const p = await detector.estimatePoses(canvas);
+                                    if(p && p.length > 0) {
+                                        p[0].keypoints.forEach(k => latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score });
+                                        let check = validateHaltung();
+                                        if (check.valid) { initWorkout(); clearInterval(retryAnchor); }
+                                        else { status.innerText = check.msg; speakErrorSmart(check.msg); }
+                                    }
+                                }, 1000);
+                            }
+                        }
+                    }, 5000);
+                };
+            } catch(e) { status.innerText = "Kamerafehler!"; status.style.color = "red"; console.error(e); }
+        }
+
+        function initWorkout() {
+            setNewAnchor("Wächter aktiv");
+            workoutInterval = setInterval(() => {
+                if (isPrepared) {
+                    totalTimeElapsed++;
+                    if (!isGracePeriodActive) {
+                        timeRemainingSeconds--; updateTimerUI();
+                    }
+                    
+                    // Prüfung auf Maximal-Deckel
+                    if (totalTimeElapsed >= capD || timeRemainingSeconds <= 0) {
+                        endWorkout(totalTimeElapsed >= capD ? "CAP_REACHED" : "SUCCESS");
+                    }
+                }
+            }, 1000);
+            setInterval(checkRules, 1000);
+        }
+
+        function setNewAnchor(audioMessage) {
+            anchorPose = {};
+            if (f('left_shoulder') && f('right_shoulder')) {
+                baseShoulderWidth = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
+            }
+            
+            const trackingList = ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_hip', 'right_hip', 'left_knee', 'right_knee', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist', 'left_heel', 'right_heel'];
+            trackingList.forEach(j => { if (f(j)) anchorPose[j] = { x: latestKeypoints[j].x, y: latestKeypoints[j].y }; });
+            
+            isPrepared = true; isGracePeriodActive = false; errorCounter = 0; remainingSecondsCounter = 3;
+            status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333";
+            if (audioMessage) speak(audioMessage, true);
         }
 
         function loop() {
             canvas.width = 257; canvas.height = 257;
-            const min = Math.min(video.videoWidth, video.videoHeight);
+            const minDim = Math.min(video.videoWidth, video.videoHeight || 480);
             ctx.save(); ctx.translate(257, 0); ctx.scale(-1, 1);
-            ctx.drawImage(video, (video.videoWidth-min)/2, (video.videoHeight-min)/2, min, min, 0, 0, 257, 257);
-            ctx.restore(); requestAnimationFrame(loop);
-        }
-
-        async function track() {
-            if (!net || video.readyState < 2) return;
-            const pose = await net.estimateSinglePose(canvas);
+            ctx.drawImage(video, (video.videoWidth - minDim) / 2, (video.videoHeight - minDim) / 2, minDim, minDim, 0, 0, 257, 257); ctx.restore();
             
-            // Wir nehmen einfach den Punkt mit dem besseren Score (links oder rechts), da du im Profil stehst
-            const s = pose.keypoints.find(k => k.part === 'leftShoulder').score > pose.keypoints.find(k => k.part === 'rightShoulder').score ? pose.keypoints.find(k => k.part === 'leftShoulder') : pose.keypoints.find(k => k.part === 'rightShoulder');
-            const h = pose.keypoints.find(k => k.part === 'leftHip').score > pose.keypoints.find(k => k.part === 'rightHip').score ? pose.keypoints.find(k => k.part === 'leftHip') : pose.keypoints.find(k => k.part === 'rightHip');
-            const k = pose.keypoints.find(k => k.part === 'leftKnee').score > pose.keypoints.find(k => k.part === 'rightKnee').score ? pose.keypoints.find(k => k.part === 'leftKnee') : pose.keypoints.find(k => k.part === 'rightKnee');
+            // INDIKATOREN LAUFEN JETZT PERMANENT AB SEKUNDE 1 FÜR ALLE ERFASSTEN PUNKTE
+            const drawPoint = (el, part) => { 
+                if (f(part)) { 
+                    el.style.left = `${(latestKeypoints[part].x / 257) * container.clientWidth}px`; el.style.top = `${(latestKeypoints[part].y / 257) * container.clientHeight}px`; el.style.display = 'block'; 
+                } else { el.style.display = 'none'; } 
+            };
+            drawPoint(pts.lS, 'left_shoulder'); drawPoint(pts.rS, 'right_shoulder');
+            drawPoint(pts.lW, 'left_wrist'); drawPoint(pts.rW, 'right_wrist');
+            drawPoint(pts.lE, 'left_elbow'); drawPoint(pts.rE, 'right_elbow');
+            drawPoint(pts.lH, 'left_hip'); drawPoint(pts.rH, 'right_hip');
+            drawPoint(pts.lK, 'left_knee'); drawPoint(pts.rK, 'right_knee');
+            drawPoint(pts.lF, 'left_heel'); drawPoint(pts.rF, 'right_heel');
+            if (f('left_ear') && f('right_ear')) { pts.head.style.left = `${(((latestKeypoints.left_ear.x + latestKeypoints.right_ear.x)/2) / 257) * container.clientWidth}px`; pts.head.style.top = `${(((latestKeypoints.left_ear.y + latestKeypoints.right_ear.y)/2) / 257) * container.clientHeight}px`; pts.head.style.display = 'block'; } else { pts.head.style.display = 'none'; }
 
-            function update(el, txt, kp) {
-                if (kp && kp.score > 0.3) {
-                    el.style.left = `${(kp.position.x / 257) * box.clientWidth}px`;
-                    el.style.top = `${(kp.position.y / 257) * box.clientHeight}px`;
-                    el.style.display = 'block';
-                    txt.innerText = `X: ${Math.round(kp.position.x)}, Y: ${Math.round(kp.position.y)}`;
-                } else { el.style.display = 'none'; txt.innerText = 'Nicht erkannt'; }
-            }
-            update(dS, vS, s); update(dH, vH, h); update(dK, vK, k);
+            requestAnimationFrame(loop);
         }
-        init();
+
+        async function checkRules() {
+            if (!detector || video.readyState < 2 || !isPrepared) return;
+            const poses = await detector.estimatePoses(canvas);
+            
+            if (!poses || poses.length === 0) { return; }
+            latestKeypoints = {};
+            poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; });
+
+            let globalDriftDetected = false;
+            const allowedDeviation = 0.14 * baseShoulderWidth;
+
+            for (const joint in anchorPose) {
+                if (f(joint)) {
+                    const dist = Math.sqrt(Math.pow(latestKeypoints[joint].x - anchorPose[joint].x, 2) + Math.pow(latestKeypoints[joint].y - anchorPose[joint].y, 2));
+                    if (dist > allowedDeviation) { globalDriftDetected = true; break; }
+                }
+            }
+
+            if (globalDriftDetected) {
+                errorCounter++;
+                if (errorCounter >= 2 || isGracePeriodActive) {
+                    let check = validateHaltung();
+                    
+                    // --- REVOLUTION: SOFORT-STRAFE BEIM ERSTEN DRIFT-VORFALL ---
+                    if (!isGracePeriodActive) { 
+                        isGracePeriodActive = true; 
+                        remainingSecondsCounter = 3; 
+                        
+                        let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
+                        timeRemainingSeconds += penalty; totalPenaltiesCount++; totalPenaltySecondsSum += penalty;
+                        updateTimerUI();
+                        
+                        const timeStamp = new Date().toLocaleTimeString('de-DE');
+                        logEvents.push(`[${timeStamp}] DRIFT: ${check.msg} -> SOFORT-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
+                        
+                        speak(`Bewegung erkannt. Plus ${penalty} Sekunden. Haltung korrigieren.`, true); 
+                    }
+                    
+                    if (remainingSecondsCounter > 0) {
+                        status.innerText = `KORREKTURZEIT! Noch ${remainingSecondsCounter}s... ⏳`;
+                        status.style.color = "#ffaa00"; timerDisplay.style.color = "#ffaa00"; container.style.borderColor = "#ffaa00";
+                        speak(remainingSecondsCounter.toString()); remainingSecondsCounter--;
+                    } else {
+                        // Nach Ablauf der 3s entscheidet die harte Biomechanik
+                        if (check.valid) { 
+                            const timeStamp = new Date().toLocaleTimeString('de-DE');
+                            logEvents.push(`[${timeStamp}] CHECKPOINT: Position erfolgreich wiederhergestellt.`);
+                            setNewAnchor("Checkpoint"); 
+                        } else {
+                            // ESKALATION: Immer noch falsch! Sofort nächste Strafe drauf!
+                            let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
+                            timeRemainingSeconds += penalty; totalPenaltiesCount++; totalPenaltySecondsSum += penalty;
+                            updateTimerUI();
+                            
+                            const timeStamp = new Date().toLocaleTimeString('de-DE');
+                            logEvents.push(`[${timeStamp}] ESKALATION: Haltung nach 3s immer noch falsch! -> FOLGE-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
+                            
+                            speak(`${check.msg}. Strafe plus ${penalty} Sekunden`, true);
+                            status.innerText = `${check.msg.toUpperCase()}! +${penalty}s! ⏳`;
+                            status.style.color = "#ff3333"; timerDisplay.style.color = "#ff3333"; remainingSecondsCounter = 3;
+                        }
+                    }
+                }
+            } else { 
+                errorCounter = 0; isGracePeriodActive = false;
+                status.innerText = "Überwachung aktiv! 🟢"; status.style.color = "#00ffcc"; timerDisplay.style.color = "#ffffff"; container.style.borderColor = "#333333"; 
+            }
+        }
+
+        async function endWorkout(endReason) {
+            clearInterval(workoutInterval); isPrepared = false; releaseWakeLock();
+            const endTimeStr = new Date().toLocaleString('de-DE');
+            
+            let statusText = endReason === "SUCCESS" ? "Erfolgreich beendet (Uhr auf 0)" : "MAXIMAL-DAUER ERREICHT (Deckel gegriffen)";
+            
+            // Logfile Text generieren
+            let logText = `=== CORNERTIME WÄCHTER REPORT ===\n`;
+            logText += `Position: ${selPos}\nArmhaltung: ${selArm}\nBeinhaltung: ${selLeg}\n\n`;
+            logText += `GEPLANTE DAUER: ${formatTime(initialTargetDuration)} (Bereich: ${minD}-${maxD}s)\n`;
+            logText += `MAXIMAL-DECKEL: ${formatTime(capD)}s\n`;
+            logText += `START-ZEIT:     ${startTimeStr}\n`;
+            logText += `END-ZEIT:       ${endTimeStr}\n`;
+            logText += `EFFEKTIVE TRAININGSZEIT: ${formatTime(totalTimeElapsed)}\n\n`;
+            logText += `--- EREIGNISSE ---\n`;
+            if(logEvents.length === 0) { logText += `Keine Vorfälle. Perfekt gehalten!\n`; }
+            else { logEvents.forEach(e => logText += e + `\n`); }
+            logText += `\nSTATUS AM ENDE: ${statusText}\n`;
+            logText += `Gesamtzahl Strafen: ${totalPenaltiesCount}\n`;
+            logText += `Gesamte Strafzeit:  +${totalPenaltySecondsSum} Sekunden\n`;
+            logText += `=================================\n`;
+            
+            // FÄLSCHUNGSSCHUTZ-SIGNATUR ERZEUGEN
+            const hash = await generateHMAC(logText, salt);
+            logText += `SIGNATUR: ${hash}\n`;
+
+            // UI umschalten
+            document.getElementById('activeScreen').style.display = 'none';
+            document.getElementById('logScreen').style.display = 'block';
+            document.getElementById('logOutput').value = logText;
+            
+            if(endReason === "SUCCESS") {
+                speak("Training beendet. Ausgezeichnet.", true);
+            } else {
+                speak("Maximalzeit erreicht. Abbruch.", true);
+            }
+        }
+
+        // --- ACCOUNTABILITY BUDDY MODUS (VERIFIKATION) ---
+        function showVerificationOption() {
+            document.getElementById('setupScreen').style.display = 'none';
+            document.getElementById('logScreen').style.display = 'block';
+            document.getElementById('logTitle').innerText = "Logfile verifizieren";
+            document.getElementById('logOutput').value = "";
+            document.getElementById('logOutput').readOnly = false;
+            document.getElementById('logOutput').placeholder = "Füge hier das Logfile deines Buddies ein...";
+            document.getElementById('buddyVerifyBox').style.display = 'block';
+        }
+
+        async function verifyPastedLog() {
+            const rawInput = document.getElementById('logOutput').value;
+            const saltCheck = document.getElementById('secretSalt').value;
+            const badge = document.getElementById('verifyBadge');
+            badge.style.display = "block";
+
+            try {
+                const lines = rawInput.split('\n');
+                let sigLineIndex = lines.findIndex(l => l.startsWith('SIGNATUR: '));
+                if(sigLineIndex === -1) {
+                    badge.className = "verification-badge badge-error"; badge.innerText = "❌ UNGÜLTIG: Keine Signatur gefunden!"; return;
+                }
+                const providedSignature = lines[sigLineIndex].replace('SIGNATUR: ', '').trim();
+                
+                // Text ohne die Signaturzeile wieder zusammenbauen
+                let textToVerify = lines.slice(0, sigLineIndex).join('\n') + '\n';
+                const computedSignature = await generateHMAC(textToVerify, saltCheck);
+
+                if(providedSignature === computedSignature) {
+                    badge.className = "verification-badge badge-success"; badge.innerText = "✅ AUTHENTISCH: Logfile ist zu 100% echt und unmanipuliert!";
+                } else {
+                    badge.className = "verification-badge badge-error"; badge.innerText = "❌ MANIPULIERT: Text oder Einstellungen wurden nachträglich verändert!";
+                }
+            } catch (err) {
+                badge.className = "verification-badge badge-error"; badge.innerText = "❌ FEHLER: Logfile-Format fehlerhaft!";
+            }
+        }
     </script>
 </body>
 </html>
