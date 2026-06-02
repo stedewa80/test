@@ -99,7 +99,7 @@ label {
     text-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
 #activeScreen, #logScreen { 
-            display: none; 
+            display: none !important;
             width: 100%; 
 }
 .status-message { 
