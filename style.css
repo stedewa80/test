@@ -98,6 +98,10 @@ label {
     text-align: center; 
     text-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
+#activeScreen, #logScreen { 
+            display: none; 
+            width: 100%; 
+}
 .status-message { 
     font-size: 1.1rem; 
     font-weight: bold; 
