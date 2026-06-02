@@ -122,6 +122,8 @@ label {
     position: relative; 
     aspect-ratio: 1 / 1; 
     box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+    margin: 0 auto; 
+    box-sizing: border-box; 
 }
 canvas#processingCanvas { 
     display: block; 
@@ -192,6 +194,7 @@ textarea.log-output {
     padding: 12px; 
     border-radius: 10px; 
     box-sizing: border-box; 
+    max-width: 100%; 
     resize: none; 
 }
 .verification-badge { 
