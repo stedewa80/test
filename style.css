@@ -100,7 +100,7 @@ label {
 }
 #activeScreen, #logScreen { 
             display: none !important;
-            width: 10%; 
+            width: 100%; 
 }
 .status-message { 
     font-size: 1.1rem; 
