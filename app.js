@@ -340,7 +340,8 @@ async function startApp() {
 }
 
 /**
- * Lädt die KI im Hintergrund und startet den Countdown für den Nutzer.
+ * Lädt die KI im Hintergrund, sagt die genaue Haltung an und 
+ * startet den Countdown erst, WENN der Satz komplett vorgelesen wurde.
  */
 async function initModelAndCountdown() {
     try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { }
@@ -355,11 +356,7 @@ async function initModelAndCountdown() {
     // Grafik-Loop starten
     loop();
     
-    let setupCountdown = 5;
-    status.innerText = `In Position gehen! (${setupCountdown}s)`; 
-    
-    // --- OPTIMIERUNG: Dynamische Ansage der gewählten Haltung ---
-    // Wir übersetzen die technischen Begriffe in schöne, gesprochene Sätze
+    // Technische Begriffe für die Sprachausgabe lesbar machen
     let ansagePosition = selPos.replace("_", " ").toLowerCase();
     let ansageArme = selArm.replace("_", " ").toLowerCase();
     let ansageBeine = selLeg.toLowerCase();
@@ -369,30 +366,42 @@ async function initModelAndCountdown() {
                     `Armhaltung: ${ansageArme}. ` +
                     `Beinhaltung: Beine ${ansageBeine}.`;
     
-    speak(startSatz, true); 
-    // -------------------------------------------------------------
-    //speak(phrases.start, true); 
+    let setupCountdown = 5;
+    status.innerText = "Bereite Routine vor... ⏳"; 
+    status.style.color = "#ffaa00"; 
     
-    let startTimer = setInterval(() => {
-        setupCountdown--;
-        if (setupCountdown > 0) {
-            status.innerText = `In Position gehen! (${setupCountdown}s)`;
-        } else {
-            clearInterval(startTimer);
-            let result = validateHaltung(); 
-            if (result.valid) { initWorkout(); } 
-            else {
-                status.innerText = result.msg; 
-                status.style.color = "#ff3333"; 
-                speak(result.msg, true);
-                let retryAnchor = setInterval(() => {
-                    let check = validateHaltung(); 
-                    if (check.valid) { initWorkout(); clearInterval(retryAnchor); } 
-                    else { status.innerText = check.msg; }
-                }, 1000);
+    // Wir sprechen den Satz und nutzen den Callback () => { ... } für den Timer
+    speak(startSatz, true, () => {
+        // DIESER BLOCK WIRD ERST AUSGEFÜHRT, WENN DER SATZ BEENDET IST
+        status.innerText = `In Position gehen! (${setupCountdown}s)`; 
+        
+        let startTimer = setInterval(() => {
+            setupCountdown--;
+            if (setupCountdown > 0) {
+                status.innerText = `In Position gehen! (${setupCountdown}s)`;
+            } else {
+                clearInterval(startTimer);
+                let result = validateHaltung(); 
+                if (result.valid) { 
+                    initWorkout(); 
+                } else {
+                    status.innerText = result.msg; 
+                    status.style.color = "#ff3333"; 
+                    speak(result.msg, true);
+                    
+                    let retryAnchor = setInterval(() => {
+                        let check = validateHaltung(); 
+                        if (check.valid) { 
+                            initWorkout(); 
+                            clearInterval(retryAnchor); 
+                        } else { 
+                            status.innerText = check.msg; 
+                        }
+                    }, 1000);
+                }
             }
-        }
-    }, 1000);
+        }, 1000);
+    });
 }
 
 /**
