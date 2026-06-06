@@ -315,15 +315,18 @@ async function startApp() {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } }); 
         video.srcObject = stream;
         
+        // This structural setup prevents camera geometry failures
         video.onloadedmetadata = async () => {
-    // Force the video element to wait until it is rendering real video dimensions
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-        video.addEventListener('loadeddata', () => startAppModelInitialization());
-    } else {
-        startAppModelInitialization();
-    }
-};
+            if (video.videoWidth === 0 || video.videoHeight === 0) {
+                video.addEventListener('loadeddata', () => startAppModelInitialization());
+            } else {
+                startAppModelInitialization();
+            }
+        };
+    } catch(e) { status.innerText = "Kamerafehler!"; status.style.color = "red"; console.error(e); }
+}
 
+// MAKE SURE THIS IS A COMPLETELY SEPARATE FUNCTION STANDING INDEPENDENTLY Outside startApp()
 async function startAppModelInitialization() {
     try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { }
     
@@ -331,7 +334,7 @@ async function startAppModelInitialization() {
     detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { 
         runtime: 'mediapipe', 
         modelType: 'lite', 
-        solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/' // Added trailing slash here
+        solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/'
     });
     
     let setupCountdown = 5;
