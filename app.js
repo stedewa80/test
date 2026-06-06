@@ -316,11 +316,52 @@ async function startApp() {
         video.srcObject = stream;
         
         video.onloadedmetadata = async () => {
-            try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { }
-            status.innerText = "Lade MediaPipe-Modell...";
-            detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { 
-                runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404' 
-            });
+    // Force the video element to wait until it is rendering real video dimensions
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+        video.addEventListener('loadeddata', () => startAppModelInitialization());
+    } else {
+        startAppModelInitialization();
+    }
+};
+
+async function startAppModelInitialization() {
+    try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { }
+    
+    status.innerText = "Lade MediaPipe-Modell...";
+    detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { 
+        runtime: 'mediapipe', 
+        modelType: 'lite', 
+        solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/' // Added trailing slash here
+    });
+    
+    let setupCountdown = 5;
+    status.innerText = `In Position gehen! (${setupCountdown}s)`; 
+    status.style.color = "#ffaa00"; 
+    speak(phrases.start, true); 
+    loop();
+    
+    let startTimer = setInterval(() => {
+        setupCountdown--;
+        if (setupCountdown > 0) {
+            status.innerText = `In Position gehen! (${setupCountdown}s)`;
+        } else {
+            clearInterval(startTimer);
+            let result = validateHaltung(); 
+            if (result.valid) { initWorkout(); } 
+            else {
+                status.innerText = result.msg; 
+                status.style.color = "#ff3333"; 
+                speak(result.msg, true);
+                let retryAnchor = setInterval(() => {
+                    let check = validateHaltung(); 
+                    if (check.valid) { initWorkout(); clearInterval(retryAnchor); } 
+                    else { status.innerText = check.msg; }
+                }, 1000);
+            }
+        }
+    }, 1000);
+}
+
             
             // Technical Refinement I: Setup Visible Start Countdown Clock
             let setupCountdown = 5;
