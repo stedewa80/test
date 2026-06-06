@@ -1,5 +1,5 @@
 // =========================================================================
-// CORNERTIME WÄCHTER - KERNSTEUERUNG (OPTIMIERTE VERSION)
+// CORNERTIME WÄCHTER - KERNSTEUERUNG (FINALE INTEGRATION)
 // =========================================================================
 
 // --- DOM Elemente & Canvas-Kontext ---
@@ -41,13 +41,13 @@ let llamaLabEndpoint = "";
 let nextEncouragementTimestamp = 0;
 let minEncouragementInterval = 20, maxEncouragementInterval = 40;
 
-// --- NEU: Explizit deklarierte Laufzeit-Variablen (Verhindert ReferenceErrors) ---
+// --- Laufzeit-Variablen (Verhindert ReferenceErrors plattformübergreifend) ---
 let initialTargetDuration = 0;
 let realStartTimestamp = 0;
 let startTimeStr = "";
 let lastCheckpointTimestamp = 0;
 let lastAICheckTimestamp = 0;
-let isProcessingPose = false; // Sperre, damit die KI sich im asynchronen Hintergrund nicht überholt
+let isProcessingPose = false; // Verhindert KI-Überholmanöver im asynchronen Hintergrund
 let logEvents = [];
 let totalPenaltiesCount = 0;
 let totalPenaltySecondsSum = 0;
@@ -80,7 +80,7 @@ const punktNamenDe = {
 // =========================================================================
 
 /**
- * Spielt Text per Web Speech API ab. Gesichert gegen API-Einfrieren.
+ * Spielt Text per Web Speech API ab. Abgesichert gegen API-Einfrieren durch Timeouts.
  */
 function speak(text, force = false, callbackOnEnd = null) {
     try {
@@ -91,8 +91,25 @@ function speak(text, force = false, callbackOnEnd = null) {
         activeUtterance.lang = 'de-DE'; 
         activeUtterance.rate = 1.15; 
         
-        activeUtterance.onend = () => { activeUtterance = null; if (callbackOnEnd) callbackOnEnd(); };
-        activeUtterance.onerror = () => { activeUtterance = null; if (callbackOnEnd) callbackOnEnd(); };
+        // Sicherheitsnetz: Nach 6 Sekunden wird die App bei TTS-Hängern unter Android/iOS zwangsfreigegeben
+        let fallbackTriggered = false;
+        const safetyTimeout = setTimeout(() => {
+            if (!fallbackTriggered) {
+                fallbackTriggered = true;
+                activeUtterance = null;
+                console.warn("SpeechSynthesis-Timeout: Zwangsbefreiung getriggert.");
+                if (callbackOnEnd) callbackOnEnd();
+            }
+        }, 6000);
+        
+        activeUtterance.onend = () => { 
+            clearTimeout(safetyTimeout);
+            if (!fallbackTriggered) { fallbackTriggered = true; activeUtterance = null; if (callbackOnEnd) callbackOnEnd(); }
+        };
+        activeUtterance.onerror = () => { 
+            clearTimeout(safetyTimeout);
+            if (!fallbackTriggered) { fallbackTriggered = true; activeUtterance = null; if (callbackOnEnd) callbackOnEnd(); }
+        };
         window.speechSynthesis.speak(activeUtterance);
     } catch (e) { 
         console.error("Audio-Fehler", e); 
@@ -111,7 +128,6 @@ function updateTimerUI() {
     timerDisplay.innerText = isTimerHidden ? "••:••" : formatTime(timeRemainingSeconds); 
 }
 
-// Prüft, ob ein Punkt von der KI mit ausreichender Konfidenz erkannt wurde
 function f(part) { return latestKeypoints[part] && latestKeypoints[part].score > 0.4; }
 
 function getHeadY() {
@@ -143,9 +159,6 @@ function updatePointDOM(element, partName, containerWidth, containerHeight) {
     } 
 }
 
-/**
- * Erstellt eine kryptografische Signatur (HMAC-SHA256) zum Schutz vor Textmanipulation
- */
 async function generateHMAC(text, secret) {
     const encoder = new TextEncoder(); 
     const keyData = encoder.encode(secret); 
@@ -156,7 +169,7 @@ async function generateHMAC(text, secret) {
 }
 
 // =========================================================================
-// ROUTINEN SHARE ENGINE (WHATSAPP & IMPORT)
+// ROUTINEN SHARE ENGINE (WHATSAPP & IMPORT-REPARATUR FÜR UMLAUTE)
 // =========================================================================
 
 async function generateRoutineString() {
@@ -191,11 +204,18 @@ async function generateRoutineString() {
 async function loadImportedRoutine(payload) {
     try {
         const parts = payload.split("::");
-        if(parts.length !== 2) return false;
+        if (parts.length !== 2) return false;
+        
         const secret = document.getElementById('secretSalt').value.trim();
         if (!secret) { alert("Bitte gib das passende Passwort ein, um die Routine zu entschlüsseln!"); return false; }
         
-        const decodedJson = decodeURIComponent(atob(parts[0]));
+        // Sicherer Umlaut-Import über TextDecoder (bricht bei Umlauten auf Mobilgeräten nicht ab)
+        const binaryString = atob(parts[0]);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        const decodedJson = new TextDecoder().decode(bytes);
         const computedSig = await generateHMAC(decodedJson, secret);
         
         if (computedSig !== parts[1]) { alert("Ungültige Signatur! Falsches Passwort oder manipulierte Routine."); return false; }
@@ -204,7 +224,11 @@ async function loadImportedRoutine(payload) {
         selPos = routine.pos; selArm = routine.arm; selLeg = routine.leg;
         minD = routine.min; maxD = routine.max; capD = routine.cap;
         return true;
-    } catch(e) { alert("Import-Fehler: Ungültiges Format!"); return false; }
+    } catch(e) { 
+        console.error(e); 
+        alert("Import-Fehler: Ungültiges Format oder beschädigte Symbole!");
+        return false; 
+    }
 }
 
 // =========================================================================
@@ -293,7 +317,7 @@ function validateHaltung() {
 }
 
 // =========================================================================
-// INITIALISIERUNG & SETUP-PROZESS
+// INITIALISIERUNG & TIMING-KORREKTUREN
 // =========================================================================
 
 async function startApp() {
@@ -340,8 +364,7 @@ async function startApp() {
 }
 
 /**
- * Lädt die KI im Hintergrund, sagt die genaue Haltung an und 
- * startet den Countdown erst, WENN der Satz komplett vorgelesen wurde.
+ * Lädt die KI im Hintergrund, liest die Übung laut vor und startet erst DANACH das 5-Sekunden-Fenster.
  */
 async function initModelAndCountdown() {
     try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { }
@@ -353,26 +376,21 @@ async function initModelAndCountdown() {
         runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/' 
     });
     
-    // Grafik-Loop starten
     loop();
     
-    // Technische Begriffe für die Sprachausgabe lesbar machen
+    // Sprach-Diktat der gewählten Haltung zusammensetzen
     let ansagePosition = selPos.replace("_", " ").toLowerCase();
     let ansageArme = selArm.replace("_", " ").toLowerCase();
     let ansageBeine = selLeg.toLowerCase();
     
-    let startSatz = `In Position gehen für deine Routine. ` +
-                    `Ausgangsposition: ${ansagePosition}. ` +
-                    `Armhaltung: ${ansageArme}. ` +
-                    `Beinhaltung: Beine ${ansageBeine}.`;
+    let startSatz = `In Position gehen für deine Routine. Ausgangsposition: ${ansagePosition}. Armhaltung: ${ansageArme}. Beinhaltung: Beine ${ansageBeine}.`;
     
     let setupCountdown = 5;
     status.innerText = "Bereite Routine vor... ⏳"; 
     status.style.color = "#ffaa00"; 
     
-    // Wir sprechen den Satz und nutzen den Callback () => { ... } für den Timer
+    // Countdown per Callback verzögern, bis der lange Satz komplett fertig gesprochen wurde
     speak(startSatz, true, () => {
-        // DIESER BLOCK WIRD ERST AUSGEFÜHRT, WENN DER SATZ BEENDET IST
         status.innerText = `In Position gehen! (${setupCountdown}s)`; 
         
         let startTimer = setInterval(() => {
@@ -391,12 +409,8 @@ async function initModelAndCountdown() {
                     
                     let retryAnchor = setInterval(() => {
                         let check = validateHaltung(); 
-                        if (check.valid) { 
-                            initWorkout(); 
-                            clearInterval(retryAnchor); 
-                        } else { 
-                            status.innerText = check.msg; 
-                        }
+                        if (check.valid) { initWorkout(); clearInterval(retryAnchor); } 
+                        else { status.innerText = check.msg; }
                     }, 1000);
                 }
             }
@@ -404,15 +418,11 @@ async function initModelAndCountdown() {
     });
 }
 
-/**
- * Berechnet den starr-fixierten Zoom-Snapshot und startet die Uhr
- */
 function initWorkout() {
     realStartTimestamp = Date.now(); 
     startTimeStr = new Date(realStartTimestamp).toLocaleString('de-DE');
     nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
     
-    // EINMALIGER PERFEKT MITTIGER SNAPSHOT (Unter Berücksichtigung der Canvas-Spiegelung)
     if (Object.keys(latestKeypoints).length > 0) {
         let minX = 257, maxX = 0, minY = 257, maxY = 0, validPoints = 0;
         for (let kp in latestKeypoints) {
@@ -445,11 +455,11 @@ function initWorkout() {
         }
     }
 
-    // EINSCHWING-PUFFER: Verhindert das sofortige fälschliche Anspringen beim Starten des Workouts
+    // Einschwing-Verzögerung für stabile Kamerakoordinaten
     setTimeout(() => {
         setNewAnchor("Wächter aktiv");
         
-        // KÜNSTLICHE REGEL-SPERRE: Gibt dem Nutzer 3 Sek Zeit zum Erstarren, bevor Drift prüft
+        // Künstliche Puffer-Sperre gegen sofortiges Anspringen beim ersten Atemzug
         lastCheckpointTimestamp = Date.now() + 3000; 
         
         workoutInterval = setInterval(() => {
@@ -471,7 +481,7 @@ function initWorkout() {
                 }
             }
         }, 1000);
-    }, 1500); // Von 600ms auf 1500ms erhöht für absolute Kamerastabilität
+    }, 1500); 
 }
 
 function setNewAnchor(audioMessage) {
@@ -496,7 +506,7 @@ function setNewAnchor(audioMessage) {
 }
 
 // =========================================================================
-// GRAFIK & KI ENGINE (HIGH PERFORMANCE LOOP)
+// GRAFIK & ASYNCHRONER KI THREAD-LOCK (60 FPS LOOP)
 // =========================================================================
 
 async function loop() {
@@ -523,15 +533,13 @@ async function loop() {
         sWidth = minDim; sHeight = minDim;
     }
 
-    // Grafik mit 60 FPS flüssig auf das Canvas zeichnen (Spiegelverkehrte Ausgabe)
     ctx.save(); 
     ctx.translate(257, 0); 
     ctx.scale(-1, 1); 
     ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, 257, 257); 
     ctx.restore();
     
-    // KI-Abfrage fest getaktet auf 500ms INTERVALL zur Ressourcenschonung
-    // Durch isProcessingPose abgesichert gegen asynchrone "Wettrennen" im Hintergrund
+    // KI-Abfrage blockfrei auf 500ms Intervall gedrosselt
     if (detector && video.readyState >= 2 && !isProcessingPose && Date.now() - lastAICheckTimestamp >= 500) { 
         isProcessingPose = true;
         lastAICheckTimestamp = Date.now();
@@ -541,14 +549,13 @@ async function loop() {
                 poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; }); 
             } 
             await checkRules(); 
-            isProcessingPose = false; // KI-Thread erst freigeben, wenn Auswertung fertig ist!
+            isProcessingPose = false; 
         }).catch(err => {
             console.error("KI-Fehler:", err);
             isProcessingPose = false;
         });
     }
     
-    // DOM-Overlays (Bunte Punkte) flüssig mit den AnimationFrames bewegen
     let cW = container.clientWidth; let cH = container.clientHeight;
     updatePointDOM(pts.lS, 'left_shoulder', cW, cH); 
     updatePointDOM(pts.rS, 'right_shoulder', cW, cH); 
@@ -576,14 +583,13 @@ async function loop() {
 }
 
 // =========================================================================
-// REGEL-ÜBERWACHUNG & STATEMACHINE
+// DEKOPPELTE REGEL-ÜBERWACHUNG & COUNTDOWN-ENGINE
 // =========================================================================
 
 async function checkRules() {
     if (Date.now() - lastCheckpointTimestamp < 2000) return; 
     if (!detector || !isPrepared || appEnded) return;
     
-    // Wenn die App gerade spricht (Erklärungen oder Strafen), blockieren wir die Prüfung
     if (isAudioSpeakingBlock) {
         if (!isGracePeriodActive) {
             status.innerText = "Haltung verletzt! Bitte zuhören... ⏳";
@@ -593,8 +599,7 @@ async function checkRules() {
         return; 
     }
 
-    // Wenn die Korrekturzeit aktiv ist, lassen wir das separate UI-Intervall arbeiten
-    // checkRules wartet hier einfach nur, bis die Zeit abgelaufen ist (gracePeriodEndTime)
+    // Wenn die Korrekturzeit läuft, hält die KI die Füße still und lässt das Intervall arbeiten
     if (isGracePeriodActive) {
         if (Date.now() >= gracePeriodEndTime) {
             let check = validateHaltung();
@@ -620,15 +625,13 @@ async function checkRules() {
                 let utteranceText = phrases.escalation.replace("{msg}", check.msg).replace("{penalty}", penalty);
                 speak(utteranceText, true, () => {
                     isAudioSpeakingBlock = false;
-                    // Nach einer Eskalation geben wir direkt wieder 3 Sekunden harte Korrekturzeit
-                    triggerVisualGracePeriod();
+                    triggerVisualGracePeriod(); // Nach Eskalation neues ehrliches 3s-Fenster öffnen
                 });
             }
         }
         return;
     }
 
-    // --- Ab hier: Normale Drift-Überwachung ---
     let brokenJoint = ""; 
     let globalDriftDetected = false; 
     const allowedDeviation = 0.14 * baseShoulderWidth;
@@ -660,29 +663,25 @@ async function checkRules() {
         let utteranceText = phrases.drift.replace("{joint}", brokenJoint).replace("{penalty}", penalty);
         speak(utteranceText, true, () => {
             isAudioSpeakingBlock = false; 
-            // Erst WENN der lange Erklärungssatz fertig gesprochen wurde,
-            // starten wir die optische und faire Korrekturzeit!
-            triggerVisualGracePeriod();
+            triggerVisualGracePeriod(); // Flüssiger optischer Countdown startet genau jetzt!
         }); 
     }
 }
 
 /**
- * NEUE UTILITY-FUNKTION: Steuert den Countdown flüssig und entkoppelt von der KI
+ * Isoliertes UI-Intervall für einen flüssigen Countdown (3, 2, 1) ohne KI-Ruckeln
  */
 function triggerVisualGracePeriod() {
     isGracePeriodActive = true;
     let localCounter = 3;
-    gracePeriodEndTime = Date.now() + 3200; // 3 Sekunden + kleiner Puffer für den finalen KI-Check
+    gracePeriodEndTime = Date.now() + 3200; 
     
-    // Sofort die 3 anzeigen und ansagen
     status.innerText = `KORREKTURZEIT! Noch ${localCounter}s... ⏳`;
     status.style.color = "#ffaa00";
     container.style.borderColor = "#ffaa00";
     if(!isTimerHidden) timerDisplay.style.color = "#ffaa00";
     speak(localCounter.toString(), false);
 
-    // Ein präzises Intervall, das jede Sekunde stur runtermarschiert (unabhängig von der KI)
     let graceTimer = setInterval(() => {
         localCounter--;
         if (localCounter > 0 && isGracePeriodActive) {
@@ -695,7 +694,7 @@ function triggerVisualGracePeriod() {
 }
 
 // =========================================================================
-// AUSWERTUNG, REPORT-EXPORT & VERIFIZIERUNG
+// REPORT-EXPORT & KRYPTO-VERIFIZIERUNG
 // =========================================================================
 
 async function endWorkout(endReason) {
