@@ -393,7 +393,6 @@ function initWorkout() {
             }
         }, 1000);
     }, 600); // 600 Millisekunden reichen der AI-Drosselung (500ms) für ein sauberes Frame-Update
-}
 
     setNewAnchor("Wächter aktiv");
     
