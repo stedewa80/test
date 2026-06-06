@@ -624,6 +624,64 @@ async function checkRules() {
         if (f(joint)) { 
             const dist = Math.sqrt(Math.pow(latestKeypoints[joint].x - anchorPose[joint].x, 2) + Math.pow(latestKeypoints[joint].y - anchorPose[joint].y, 2)); 
             if (dist > allowedDeviation) { 
+async function checkRules() {
+    if (Date.now() - lastCheckpointTimestamp < 2000) return; 
+    if (!detector || !isPrepared || appEnded) return;
+    
+    // Wenn die App gerade spricht (Erklärungen oder Strafen), blockieren wir die Prüfung
+    if (isAudioSpeakingBlock) {
+        if (!isGracePeriodActive) {
+            status.innerText = "Haltung verletzt! Bitte zuhören... ⏳";
+            status.style.color = "#ffaa00"; 
+            container.style.borderColor = "#ffaa00";
+        }
+        return; 
+    }
+
+    // Wenn die Korrekturzeit aktiv ist, lassen wir das separate UI-Intervall arbeiten
+    // checkRules wartet hier einfach nur, bis die Zeit abgelaufen ist (gracePeriodEndTime)
+    if (isGracePeriodActive) {
+        if (Date.now() >= gracePeriodEndTime) {
+            let check = validateHaltung();
+            if (check.valid) { 
+                const timeStamp = new Date().toLocaleTimeString('de-DE'); 
+                logEvents.push(`[${timeStamp}] CHECKPOINT: Position erfolgreich wiederhergestellt.`); 
+                setNewAnchor(phrases.checkpoint); 
+            } else {
+                let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP; 
+                timeRemainingSeconds += penalty; 
+                totalPenaltiesCount++; 
+                totalPenaltySecondsSum += penalty; 
+                updateTimerUI();
+                
+                const timeStamp = new Date().toLocaleTimeString('de-DE'); 
+                logEvents.push(`[${timeStamp}] ESKALATION: Haltung falsch (${check.msg}) -> FOLGE-STRAFE: +${penalty}s`);
+                
+                status.innerText = `${check.msg.toUpperCase()}! +${penalty}s! ⏳`; 
+                status.style.color = "#ff3333"; 
+                if(!isTimerHidden) timerDisplay.style.color = "#ff3333";
+                
+                isAudioSpeakingBlock = true;
+                let utteranceText = phrases.escalation.replace("{msg}", check.msg).replace("{penalty}", penalty);
+                speak(utteranceText, true, () => {
+                    isAudioSpeakingBlock = false;
+                    // Nach einer Eskalation geben wir direkt wieder 3 Sekunden harte Korrekturzeit
+                    triggerVisualGracePeriod();
+                });
+            }
+        }
+        return;
+    }
+
+    // --- Ab hier: Normale Drift-Überwachung ---
+    let brokenJoint = ""; 
+    let globalDriftDetected = false; 
+    const allowedDeviation = 0.14 * baseShoulderWidth;
+
+    for (const joint in anchorPose) { 
+        if (f(joint)) { 
+            const dist = Math.sqrt(Math.pow(latestKeypoints[joint].x - anchorPose[joint].x, 2) + Math.pow(latestKeypoints[joint].y - anchorPose[joint].y, 2)); 
+            if (dist > allowedDeviation) { 
                 globalDriftDetected = true; 
                 brokenJoint = punktNamenDe[joint] || joint; 
                 break; 
@@ -633,15 +691,7 @@ async function checkRules() {
 
     if (globalDriftDetected) {
         let check = validateHaltung();
-        isGracePeriodActive = true; 
         isAudioSpeakingBlock = true; 
-        remainingSecondsCounter = 3;
-        
-        // BLITZER-EFFEKT: UI sofort im exakt selben Frame orange färben, nicht auf den nächsten Loop warten!
-        status.innerText = `KORREKTURZEIT! Noch 3s... ⏳`;
-        status.style.color = "#ffaa00";
-        container.style.borderColor = "#ffaa00";
-        if(!isTimerHidden) timerDisplay.style.color = "#ffaa00";
         
         let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP; 
         timeRemainingSeconds += penalty; 
@@ -655,9 +705,38 @@ async function checkRules() {
         let utteranceText = phrases.drift.replace("{joint}", brokenJoint).replace("{penalty}", penalty);
         speak(utteranceText, true, () => {
             isAudioSpeakingBlock = false; 
-            gracePeriodEndTime = Date.now() + 3500; // 3,5 Sek als Taktpuffer, damit der Nutzer echte 3s Zeit hat
+            // Erst WENN der lange Erklärungssatz fertig gesprochen wurde,
+            // starten wir die optische und faire Korrekturzeit!
+            triggerVisualGracePeriod();
         }); 
     }
+}
+
+/**
+ * NEUE UTILITY-FUNKTION: Steuert den Countdown flüssig und entkoppelt von der KI
+ */
+function triggerVisualGracePeriod() {
+    isGracePeriodActive = true;
+    let localCounter = 3;
+    gracePeriodEndTime = Date.now() + 3200; // 3 Sekunden + kleiner Puffer für den finalen KI-Check
+    
+    // Sofort die 3 anzeigen und ansagen
+    status.innerText = `KORREKTURZEIT! Noch ${localCounter}s... ⏳`;
+    status.style.color = "#ffaa00";
+    container.style.borderColor = "#ffaa00";
+    if(!isTimerHidden) timerDisplay.style.color = "#ffaa00";
+    speak(localCounter.toString(), false);
+
+    // Ein präzises Intervall, das jede Sekunde stur runtermarschiert (unabhängig von der KI)
+    let graceTimer = setInterval(() => {
+        localCounter--;
+        if (localCounter > 0 && isGracePeriodActive) {
+            status.innerText = `KORREKTURZEIT! Noch ${localCounter}s... ⏳`;
+            speak(localCounter.toString(), false);
+        } else {
+            clearInterval(graceTimer);
+        }
+    }, 1000);
 }
 
 // =========================================================================
