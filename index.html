@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CornerTime - Unbestechlicher Wächter Pro v3.0</title>
+    
+    <link rel="stylesheet" href="style.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.20.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.20.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3"></script>
+</head>
+<body>
+    <div class="app-container">
+        <div id="setupScreen" class="setup-screen">
+        <div id="setupScreen">
+    <h2>Cornertime Wächter Setup</h2>
+    
+    <div class="form-group">
+        <label for="positionSelect">Position</label>
+        <select id="positionSelect">
+            <option value="STEHEND">Stehend</option>
+            <option value="KNIEND_AUFRECHT">Kniend (Aufrecht)</option>
+            <option value="KNIEND_SITZEND">Kniend (Sitzend)</option>
+            <option value="KNIEND_VORGEBEUGT">Kniend (Vorgebeugt)</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="armSelect">Armhaltung</label>
+        <select id="armSelect">
+            <option value="UEBER_KOPF">Über Kopf</option>
+            <option value="AUF_KOPF">Auf dem Kopf</option>
+            <option value="HINTER_KOPF">Hinter dem Kopf</option>
+            <option value="DREIZACK">Dreizack</option>
+            <option value="RUECKEN_ELLBOGEN">Rücken (Ellbogen greifen)</option>
+            <option value="RUECKEN_PO">Rücken (Hände auf Po)</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="legSelect">Beinhaltung</label>
+        <select id="legSelect">
+            <option value="NORMAL">Normal</option>
+            <option value="ZUSAMMEN">Zusammen</option>
+            <option value="GESPREIZT">Gespreizt</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="minDuration">Minimale Dauer (Sekunden)</label>
+        <input type="number" id="minDuration" value="30">
+    </div>
+
+    <div class="form-group">
+        <label for="maxDuration">Maximale Dauer (Sekunden)</label>
+        <input type="number" id="maxDuration" value="45">
+    </div>
+
+    <div class="form-group">
+        <label for="capDuration">Maximal-Deckel (Sekunden)</label>
+        <input type="number" id="capDuration" value="120">
+    </div>
+
+    <div class="form-group">
+        <label for="minPenalty">Minimale Strafe (Sekunden)</label>
+        <input type="number" id="minPenalty" value="5">
+    </div>
+
+    <div class="form-group">
+        <label for="maxPenalty">Maximale Strafe (Sekunden)</label>
+        <input type="number" id="maxPenalty" value="10">
+    </div>
+
+    <div class="form-group">
+        <label for="secretSalt">Geheimer Schlüssel (Salt / Passwort)</label>
+        <input type="password" id="secretSalt" placeholder="Euer gemeinsames Passwort">
+    </div>
+
+    <label class="checkbox-group">
+        <input type="checkbox" id="hideTimerCheckbox">
+        <span>Blind-Modus (Timer während des Trainings verbergen)</span>
+    </label>
+
+    <div class="form-group">
+        <label for="llamaEndpointInput">LlamaLab Automate Endpunkt (Optional)</label>
+        <input type="text" id="llamaEndpointInput" placeholder="http://192.168.x.x:8080/endpoint">
+        <span class="field-help">Trage hier die Webhook-URL ein, um Apps nach Erfolg freizuschalten.</span>
+    </div>
+
+    <hr>
+
+    <div class="form-group">
+        <label for="routineImportInput">Geheime WhatsApp-Routine importieren</label>
+        <textarea id="routineImportInput" placeholder="Füge hier den Code ein, den dein Buddy dir geschickt hat..."></textarea>
+        <span class="field-help">Lass das Feld frei, wenn du deine eigenen Parameter von oben nutzen willst.</span>
+    </div>
+
+    <button onclick="startApp()">Wächter Starten</button>
+    <button class="btn-whatsapp" onclick="generateRoutineString()">Routine erstellen & per WhatsApp senden</button>
+</div>
+
+        
+        <div id="activeScreen">
+            <div id="timerDisplay" class="timer-display">00:00</div>
+            <div id="status" class="status-message">Kamera initialisieren...</div>
+            <div class="camera-box" id="camContainer">
+                <video id="webcam" autoplay playsinline muted style="display:none;"></video>
+                <canvas id="processingCanvas"></canvas>
+                
+                <div id="ptHead" class="joint-indicator"></div>
+                <div id="ptLShoulder" class="joint-indicator"></div>
+                <div id="ptRShoulder" class="joint-indicator"></div>
+                <div id="ptLWrist" class="joint-indicator"></div>
+                <div id="ptRWrist" class="joint-indicator"></div>
+                <div id="ptLElbow" class="joint-indicator"></div>
+                <div id="ptRElbow" class="joint-indicator"></div>
+                <div id="ptLHip" class="joint-indicator"></div>
+                <div id="ptRHip" class="joint-indicator"></div>
+                <div id="ptLKnee" class="joint-indicator"></div>
+                <div id="ptRKnee" class="joint-indicator"></div>
+                <div id="ptLFoot" class="joint-indicator"></div>
+                <div id="ptRFoot" class="joint-indicator"></div>
+            </div>
+        </div>
+
+        <div id="logScreen" class="log-screen">
+            <h2 id="logTitle">Workout Protokoll</h2>
+            <div id="verifyBadge" class="verification-badge" style="display:none;"></div>
+            <p style="font-size:0.85rem; color:#aaa; margin-bottom:10px;">Kopiere den gesamten unteren Block für deinen Buddy:</p>
+            <textarea id="logOutput" class="log-output" readonly></textarea>
+            <div id="buddyVerifyBox" style="display:none; margin-top:15px;">
+                <button class="start-btn" style="margin-top:0;" onclick="verifyPastedLog()">LOG JETZT PRÜFEN</button>
+            </div>
+            <button class="secondary-btn" onclick="location.reload()">Zurück zum Hauptmenü</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
