@@ -114,21 +114,72 @@ async function generateHMAC(text, secret) {
 
 // --- WhatsApp Routine Share Engines (Feature II) ---
 async function generateRoutineString() {
-    const routineData = {
-        pos: document.getElementById('positionSelect').value,
-        arm: document.getElementById('armSelect').value,
-        leg: document.getElementById('legSelect').value,
-        min: parseInt(document.getElementById('minDuration').value),
-        max: parseInt(document.getElementById('maxDuration').value),
-        cap: parseInt(document.getElementById('capDuration').value)
-    };
-    const secret = document.getElementById('secretSalt').value;
-    const rawJson = JSON.stringify(routineData);
-    const signature = await generateHMAC(rawJson, secret);
-    const sharePayload = btoa(unescape(encodeURIComponent(rawJson))) + "::" + signature;
-    
-    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent("Hier ist deine geheime Routine: " + sharePayload)}`;
-    window.open(whatsappUrl, '_blank');
+    try {
+        // 1. Verify that all elements actually exist in your HTML
+        const elPos = document.getElementById('positionSelect');
+        const elArm = document.getElementById('armSelect');
+        const elLeg = document.getElementById('legSelect');
+        const elMin = document.getElementById('minDuration');
+        const elMax = document.getElementById('maxDuration');
+        const elCap = document.getElementById('capDuration');
+        const elSalt = document.getElementById('secretSalt');
+
+        // Validation check to tell you exactly what is missing in the HTML layout
+        if (!elPos || !elArm || !elLeg || !elMin || !elMax || !elCap || !elSalt) {
+            let missing = [];
+            if (!elPos) missing.push('positionSelect');
+            if (!elArm) missing.push('armSelect');
+            if (!elLeg) missing.push('legSelect');
+            if (!elMin) missing.push('minDuration');
+            if (!elMax) missing.push('maxDuration');
+            if (!elCap) missing.push('capDuration');
+            if (!elSalt) missing.push('secretSalt');
+            
+            alert(`HTML Fehler: Folgende IDs fehlen in deinem Setup-Screen: ${missing.join(', ')}`);
+            return;
+        }
+
+        const secret = elSalt.value.trim();
+        if (!secret) {
+            alert("Bitte gib zuerst einen geheimen Schlüssel (Salt) ein, damit die Routine signiert werden kann!");
+            return;
+        }
+
+        // 2. Build the payload cleanly
+        const routineData = {
+            pos: elPos.value,
+            arm: elArm.value,
+            leg: elLeg.value,
+            min: parseInt(elMin.value) || 30,
+            max: parseInt(elMax.value) || 45,
+            cap: parseInt(elCap.value) || 120
+        };
+
+        const rawJson = JSON.stringify(routineData);
+        const signature = await generateHMAC(rawJson, secret);
+        
+        // Base64 encoding that safely handles special characters
+        const base64Payload = btoa(encodeURIComponent(rawJson).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+            return String.fromCharCode(parseInt(p1, 16));
+        }));
+        
+        const sharePayload = base64Payload + "::" + signature;
+        const textMessage = `Hier ist deine geheime Cornertime-Routine:\n\n${sharePayload}`;
+
+        // 3. Try to open WhatsApp
+        const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(textMessage)}`;
+        const newWindow = window.open(whatsappUrl, '_blank');
+        
+        // Fallback: If a mobile browser or adblocker blocks the window popup, copy it to clipboard instead
+        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+            await navigator.clipboard.writeText(textMessage);
+            alert("WhatsApp konnte nicht automatisch geöffnet werden (Popup-Blocker). Die Routine wurde stattdessen in deine Zwischenablage kopiert! Du kannst sie jetzt einfach manuell in WhatsApp einfügen (Strg+V / Gedrückt halten).");
+        }
+
+    } catch (error) {
+        console.error("Fehler beim Erstellen der Routine:", error);
+        alert(`Ein unerwarteter Fehler ist aufgetreten: ${error.message}`);
+    }
 }
 
 async function loadImportedRoutine(payload) {
