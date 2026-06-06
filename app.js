@@ -1,7 +1,16 @@
-// --- Globale Variablen & Konfigurationen ---
-const video = document.getElementById('webcam'), canvas = document.getElementById('processingCanvas'), ctx = canvas.getContext('2d');
-const container = document.getElementById('camContainer'), status = document.getElementById('status'), timerDisplay = document.getElementById('timerDisplay');
+// =========================================================================
+// CORNERTIME WÄCHTER - KERNSTEUERUNG (OPTIMIERTE VERSION)
+// =========================================================================
 
+// --- DOM Elemente & Canvas-Kontext ---
+const video = document.getElementById('webcam');
+const canvas = document.getElementById('processingCanvas');
+const ctx = canvas.getContext('2d');
+const container = document.getElementById('camContainer');
+const status = document.getElementById('status');
+const timerDisplay = document.getElementById('timerDisplay');
+
+// --- Physische Tracking-Punkte im UI (DOM-Overlays) ---
 const pts = { 
     head: document.getElementById('ptHead'), lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), 
     lW: document.getElementById('ptLWrist'), rW: document.getElementById('ptRWrist'), lE: document.getElementById('ptLElbow'), 
@@ -9,35 +18,41 @@ const pts = {
     lK: document.getElementById('ptLKnee'), rK: document.getElementById('ptRKnee'), lF: document.getElementById('ptLFoot'), rF: document.getElementById('ptRFoot')
 };
 
+// --- App-Konfigurationen & Übungs-Auswahl ---
 let selPos = "", selArm = "", selLeg = "";
 let minD = 30, maxD = 45, capD = 120, minP = 5, maxP = 10, salt = "";
 let detector = null, anchorPose = {}, isPrepared = false, latestKeypoints = {}, baseShoulderWidth = 100, wakeLock = null;
 let timeRemainingSeconds = 30, totalTimeElapsed = 0, workoutInterval = null;
 
-// Grace Periods, Timers, und Audio Blocks
-let isGracePeriodActive = false, gracePeriodEndTime = 0, remainingSecondsCounter = 3, appEnded = false;
-let isAudioSpeakingBlock = false, activeUtterance = null; 
+// --- Status-Flags für Timers, Fehlerphasen & Audio ---
+let isGracePeriodActive = false;
+let gracePeriodEndTime = 0;
+let remainingSecondsCounter = 3;
+let appEnded = false;
+let isAudioSpeakingBlock = false;
+let activeUtterance = null; 
 
-// Einmaliger, starrer Zoom-Snapshot Speicher
+// --- Einmaliger, starrer Zoom-Snapshot Speicher ---
 let staticZoomCoords = null; 
 
-// Feature-Flags & Anpassungen
+// --- Feature-Flags & Motivations-Engine ---
 let isTimerHidden = false;
 let llamaLabEndpoint = ""; 
 let nextEncouragementTimestamp = 0;
 let minEncouragementInterval = 20, maxEncouragementInterval = 40;
 
-// NEU: Hier sauber deklarierte fehlende Variablen
+// --- NEU: Explizit deklarierte Laufzeit-Variablen (Verhindert ReferenceErrors) ---
 let initialTargetDuration = 0;
 let realStartTimestamp = 0;
 let startTimeStr = "";
 let lastCheckpointTimestamp = 0;
 let lastAICheckTimestamp = 0;
+let isProcessingPose = false; // Sperre, damit die KI sich im asynchronen Hintergrund nicht überholt
 let logEvents = [];
 let totalPenaltiesCount = 0;
 let totalPenaltySecondsSum = 0;
 
-// Anpassbare Sprachphrasen
+// --- Anpassbare Sprachphrasen (TTS) ---
 let phrases = {
     start: "In Position gehen",
     drift: "Bewegung erkannt bei {joint}. Plus {penalty} Sekunden. Haltung korrigieren.",
@@ -48,7 +63,7 @@ let phrases = {
 };
 let encouragementPhrases = ["Halt durch!", "Sehr gute Haltung!", "Bleib genau so.", "Rücken gerade lassen, perfekt!"];
 
-// HIER SIND LINKS UND RECHTS FÜR DEN SPIEGEL-MODUS DIREKT VERTAUSCHT
+// --- Deutsche Übersetzung der Gliedmaßen (Für den Spiegel-Modus vertauscht) ---
 const punktNamenDe = {
     'left_shoulder': 'Rechte Schulter', 'right_shoulder': 'Linke Schulter', 
     'left_elbow': 'Rechter Ellbogen', 'right_elbow': 'Linker Ellbogen',
@@ -60,7 +75,13 @@ const punktNamenDe = {
     'left_ear': 'Kopf', 'right_ear': 'Kopf'
 };
 
-// --- Sprachausgabe (Abgesichert gegen Einfrieren) ---
+// =========================================================================
+// SPRACHAUSGABE & UTILITIES
+// =========================================================================
+
+/**
+ * Spielt Text per Web Speech API ab. Gesichert gegen API-Einfrieren.
+ */
 function speak(text, force = false, callbackOnEnd = null) {
     try {
         if (force) { window.speechSynthesis.cancel(); }
@@ -90,6 +111,7 @@ function updateTimerUI() {
     timerDisplay.innerText = isTimerHidden ? "••:••" : formatTime(timeRemainingSeconds); 
 }
 
+// Prüft, ob ein Punkt von der KI mit ausreichender Konfidenz erkannt wurde
 function f(part) { return latestKeypoints[part] && latestKeypoints[part].score > 0.4; }
 
 function getHeadY() {
@@ -121,6 +143,9 @@ function updatePointDOM(element, partName, containerWidth, containerHeight) {
     } 
 }
 
+/**
+ * Erstellt eine kryptografische Signatur (HMAC-SHA256) zum Schutz vor Textmanipulation
+ */
 async function generateHMAC(text, secret) {
     const encoder = new TextEncoder(); 
     const keyData = encoder.encode(secret); 
@@ -130,7 +155,10 @@ async function generateHMAC(text, secret) {
     return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// --- WhatsApp Routinen-Generierung & Import ---
+// =========================================================================
+// ROUTINEN SHARE ENGINE (WHATSAPP & IMPORT)
+// =========================================================================
+
 async function generateRoutineString() {
     try {
         const secret = document.getElementById('secretSalt').value.trim();
@@ -179,7 +207,10 @@ async function loadImportedRoutine(payload) {
     } catch(e) { alert("Import-Fehler: Ungültiges Format!"); return false; }
 }
 
-// --- Haltungs-Validierung ---
+// =========================================================================
+// POSEN-VALIDIERUNG (GEOMETRISCHE REGELN)
+// =========================================================================
+
 function validateHaltung() {
     if (!f('left_shoulder') || !f('right_shoulder')) return { valid: false, msg: "Körper nicht im Bild" };
     const sb = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
@@ -261,11 +292,13 @@ function validateHaltung() {
     return { valid: true, msg: "Überwachung aktiv! 🟢" };
 }
 
-// --- App Start & Initialisierung ---
+// =========================================================================
+// INITIALISIERUNG & SETUP-PROZESS
+// =========================================================================
+
 async function startApp() {
     salt = document.getElementById('secretSalt').value;
     isTimerHidden = document.getElementById('hideTimerCheckbox').checked;
-    
     llamaLabEndpoint = document.getElementById('llamaEndpointInput').value;
 
     const routinePaste = document.getElementById('routineImportInput').value.trim();
@@ -306,7 +339,9 @@ async function startApp() {
     } catch(e) { status.innerText = "Kamerafehler!"; status.style.color = "red"; console.error(e); }
 }
 
-// FIX: Duplizierten Funktionskopf entfernt & Struktur bereinigt
+/**
+ * Lädt die KI im Hintergrund und startet den Countdown für den Nutzer.
+ */
 async function initModelAndCountdown() {
     try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { }
     
@@ -317,6 +352,7 @@ async function initModelAndCountdown() {
         runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/' 
     });
     
+    // Grafik-Loop starten
     loop();
     
     let setupCountdown = 5;
@@ -345,11 +381,15 @@ async function initModelAndCountdown() {
     }, 1000);
 }
 
+/**
+ * Berechnet den starr-fixierten Zoom-Snapshot und startet die Uhr
+ */
 function initWorkout() {
     realStartTimestamp = Date.now(); 
     startTimeStr = new Date(realStartTimestamp).toLocaleString('de-DE');
     nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
     
+    // EINMALIGER PERFEKT MITTIGER SNAPSHOT (Unter Berücksichtigung der Canvas-Spiegelung)
     if (Object.keys(latestKeypoints).length > 0) {
         let minX = 257, maxX = 0, minY = 257, maxY = 0, validPoints = 0;
         for (let kp in latestKeypoints) {
@@ -382,13 +422,11 @@ function initWorkout() {
         }
     }
 
-        // Sicherheits-Puffer erhöhen und KI erst "einschwingen" lassen
+    // EINSCHWING-PUFFER: Verhindert das sofortige fälschliche Anspringen beim Starten des Workouts
     setTimeout(() => {
-        // 1. Anchor mit den absolut frischesten, stabilisierten Punkten setzen
         setNewAnchor("Wächter aktiv");
         
-        // 2. Den Zeitstempel für den letzten Checkpoint künstlich in die Zukunft verschieben!
-        // Dadurch hat checkRules() eine zusätzliche Sperre von 3 Sekunden, bevor es anschlagen darf.
+        // KÜNSTLICHE REGEL-SPERRE: Gibt dem Nutzer 3 Sek Zeit zum Erstarren, bevor Drift prüft
         lastCheckpointTimestamp = Date.now() + 3000; 
         
         workoutInterval = setInterval(() => {
@@ -410,7 +448,7 @@ function initWorkout() {
                 }
             }
         }, 1000);
-    }, 1500); // Von 600ms auf 1500ms erhöht, damit das Kamerabild garantiert stabil ist
+    }, 1500); // Von 600ms auf 1500ms erhöht für absolute Kamerastabilität
 }
 
 function setNewAnchor(audioMessage) {
@@ -433,6 +471,10 @@ function setNewAnchor(audioMessage) {
     container.style.borderColor = "#333333";
     if (audioMessage) speak(audioMessage, true);
 }
+
+// =========================================================================
+// GRAFIK & KI ENGINE (HIGH PERFORMANCE LOOP)
+// =========================================================================
 
 async function loop() {
     if (appEnded) return; 
@@ -458,21 +500,32 @@ async function loop() {
         sWidth = minDim; sHeight = minDim;
     }
 
+    // Grafik mit 60 FPS flüssig auf das Canvas zeichnen (Spiegelverkehrte Ausgabe)
     ctx.save(); 
     ctx.translate(257, 0); 
     ctx.scale(-1, 1); 
     ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, 257, 257); 
     ctx.restore();
     
-    if (detector && video.readyState >= 2 && Date.now() - lastAICheckTimestamp >= 500) { 
+    // KI-Abfrage fest getaktet auf 500ms INTERVALL zur Ressourcenschonung
+    // Durch isProcessingPose abgesichert gegen asynchrone "Wettrennen" im Hintergrund
+    if (detector && video.readyState >= 2 && !isProcessingPose && Date.now() - lastAICheckTimestamp >= 500) { 
+        isProcessingPose = true;
         lastAICheckTimestamp = Date.now();
-        const poses = await detector.estimatePoses(canvas); 
-        if (poses && poses.length > 0) { 
-            poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; }); 
-        } 
-        await checkRules(); 
+        
+        detector.estimatePoses(canvas).then(async (poses) => {
+            if (poses && poses.length > 0) { 
+                poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; }); 
+            } 
+            await checkRules(); 
+            isProcessingPose = false; // KI-Thread erst freigeben, wenn Auswertung fertig ist!
+        }).catch(err => {
+            console.error("KI-Fehler:", err);
+            isProcessingPose = false;
+        });
     }
     
+    // DOM-Overlays (Bunte Punkte) flüssig mit den AnimationFrames bewegen
     let cW = container.clientWidth; let cH = container.clientHeight;
     updatePointDOM(pts.lS, 'left_shoulder', cW, cH); 
     updatePointDOM(pts.rS, 'right_shoulder', cW, cH); 
@@ -499,6 +552,10 @@ async function loop() {
     requestAnimationFrame(loop);
 }
 
+// =========================================================================
+// REGEL-ÜBERWACHUNG & STATEMACHINE
+// =========================================================================
+
 async function checkRules() {
     if (Date.now() - lastCheckpointTimestamp < 2000) return; 
     if (!detector || !isPrepared || appEnded) return;
@@ -513,7 +570,8 @@ async function checkRules() {
     }
 
     if (isGracePeriodActive) {
-        let timeLeft = Math.ceil((gracePeriodEndTime - Date.now()) / 1000);
+        // Math.round fängt das 500ms Taktungsraster der KI ab -> Countdown zählt jetzt sauber ab 3!
+        let timeLeft = Math.round((gracePeriodEndTime - Date.now()) / 1000);
 
         if (timeLeft > 0) {
             status.innerText = `KORREKTURZEIT! Noch ${timeLeft}s... ⏳`; 
@@ -551,7 +609,7 @@ async function checkRules() {
                 speak(utteranceText, true, () => {
                     isAudioSpeakingBlock = false;
                     remainingSecondsCounter = 3; 
-                    gracePeriodEndTime = Date.now() + 3000; 
+                    gracePeriodEndTime = Date.now() + 3500; // 3,5 Sek als Taktpuffer
                 });
             }
         }
@@ -579,6 +637,12 @@ async function checkRules() {
         isAudioSpeakingBlock = true; 
         remainingSecondsCounter = 3;
         
+        // BLITZER-EFFEKT: UI sofort im exakt selben Frame orange färben, nicht auf den nächsten Loop warten!
+        status.innerText = `KORREKTURZEIT! Noch 3s... ⏳`;
+        status.style.color = "#ffaa00";
+        container.style.borderColor = "#ffaa00";
+        if(!isTimerHidden) timerDisplay.style.color = "#ffaa00";
+        
         let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP; 
         timeRemainingSeconds += penalty; 
         totalPenaltiesCount++; 
@@ -591,10 +655,14 @@ async function checkRules() {
         let utteranceText = phrases.drift.replace("{joint}", brokenJoint).replace("{penalty}", penalty);
         speak(utteranceText, true, () => {
             isAudioSpeakingBlock = false; 
-            gracePeriodEndTime = Date.now() + 3000; 
+            gracePeriodEndTime = Date.now() + 3500; // 3,5 Sek als Taktpuffer, damit der Nutzer echte 3s Zeit hat
         }); 
     }
 }
+
+// =========================================================================
+// AUSWERTUNG, REPORT-EXPORT & VERIFIZIERUNG
+// =========================================================================
 
 async function endWorkout(endReason) {
     appEnded = true; 
