@@ -357,7 +357,21 @@ async function initModelAndCountdown() {
     
     let setupCountdown = 5;
     status.innerText = `In Position gehen! (${setupCountdown}s)`; 
-    speak(phrases.start, true); 
+    
+    // --- OPTIMIERUNG: Dynamische Ansage der gewählten Haltung ---
+    // Wir übersetzen die technischen Begriffe in schöne, gesprochene Sätze
+    let ansagePosition = selPos.replace("_", " ").toLowerCase();
+    let ansageArme = selArm.replace("_", " ").toLowerCase();
+    let ansageBeine = selLeg.toLowerCase();
+    
+    let startSatz = `In Position gehen für deine Routine. ` +
+                    `Ausgangsposition: ${ansagePosition}. ` +
+                    `Armhaltung: ${ansageArme}. ` +
+                    `Beinhaltung: Beine ${ansageBeine}.`;
+    
+    speak(startSatz, true); 
+    // -------------------------------------------------------------
+    //speak(phrases.start, true); 
     
     let startTimer = setInterval(() => {
         setupCountdown--;
