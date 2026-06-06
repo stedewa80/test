@@ -100,7 +100,7 @@ function speak(text, force = false, callbackOnEnd = null) {
                 console.warn("SpeechSynthesis-Timeout: Zwangsbefreiung getriggert.");
                 if (callbackOnEnd) callbackOnEnd();
             }
-        }, 6000);
+        }, 15000);
         
         activeUtterance.onend = () => { 
             clearTimeout(safetyTimeout);
