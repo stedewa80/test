@@ -348,19 +348,29 @@ async function startApp() {
     initialTargetDuration = timeRemainingSeconds; 
     updateTimerUI();
     
-    try {
+        try {
         status.innerText = "Kamera-Zugriff anfordern...";
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } }); 
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } 
+        }); 
         video.srcObject = stream;
         
-        video.onloadedmetadata = async () => {
-            if (video.videoWidth === 0 || video.videoHeight === 0) {
-                video.addEventListener('loadeddata', () => initModelAndCountdown());
-            } else {
+        // Erzwungenes Abspielen, falls der Browser autoreguliert
+        await video.play(); 
+        
+        // Puffer-Intervall: Warten, bis die Kamera wirklich Pixel liefert
+        let videoCheckTimeout = setInterval(() => {
+            if (video.videoWidth > 0 && video.videoHeight > 0) {
+                clearInterval(videoCheckTimeout);
                 initModelAndCountdown();
             }
-        };
-    } catch(e) { status.innerText = "Kamerafehler!"; status.style.color = "red"; console.error(e); }
+        }, 100);
+
+    } catch(e) { 
+        status.innerText = "Kamerafehler! " + e.message; 
+        status.style.color = "red"; 
+        console.error(e); 
+    }
 }
 
 /**
