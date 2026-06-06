@@ -63,6 +63,14 @@
             
             <button class="start-btn" onclick="startApp()">WÄCHTER AKTIVIEREN</button>
             <button class="secondary-btn" onclick="showVerificationOption()">Logfile verifizieren (Buddy-Modus)</button>
+            <label><input type="checkbox" id="hideTimerCheckbox"> Blind-Modus (Timer verbergen)</label>
+    
+    <input type="text" id="llamaEndpointInput" placeholder="http://192.168.x.x:8080/llamautoloop (Optional)">
+    <small>LlamaLab Automate Netzwerk-Endpunkt für App-Sperren.</small>
+
+    <hr>
+    <textarea id="routineImportInput" placeholder="Geheime WhatsApp-Routine hier einfügen..."></textarea>
+    <button onclick="generateRoutineString()">Routine erstellen & per WhatsApp senden</button>
         </div>
         
         <div id="activeScreen">
