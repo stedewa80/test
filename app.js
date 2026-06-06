@@ -336,7 +336,7 @@ function initWorkout() {
     startTimeStr = new Date(realStartTimestamp).toLocaleString('de-DE');
     nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
     
-    // EINMALIGER PERFEKT ZENTRIERTER SNAPSHOT NACH COUNTDOWN
+    // 1. EINMALIGER PERFEKT ZENTRIERTER SNAPSHOT NACH COUNTDOWN
     if (Object.keys(latestKeypoints).length > 0) {
         let minX = 257, maxX = 0, minY = 257, maxY = 0, validPoints = 0;
         for (let kp in latestKeypoints) {
@@ -367,6 +367,33 @@ function initWorkout() {
             };
         }
     }
+
+    // 2. TIMEOUT-PUFFER: Warte 600ms, bis die KI den neuen Bildausschnitt erfasst hat,
+    // erst DANN wird der unbestechliche Haltungs-Anchor scharfgeschaltet!
+    setTimeout(() => {
+        setNewAnchor("Wächter aktiv");
+        
+        workoutInterval = setInterval(() => {
+            if (isPrepared && !appEnded) {
+                totalTimeElapsed++;
+                if (!isGracePeriodActive && !isAudioSpeakingBlock) { 
+                    timeRemainingSeconds--; 
+                    updateTimerUI(); 
+                }
+                
+                if (!isGracePeriodActive && !isAudioSpeakingBlock && Date.now() >= nextEncouragementTimestamp) {
+                    let randomPhrase = encouragementPhrases[Math.floor(Math.random() * encouragementPhrases.length)];
+                    speak(randomPhrase, false);
+                    nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
+                }
+
+                if (totalTimeElapsed >= capD || timeRemainingSeconds <= 0) { 
+                    endWorkout(totalTimeElapsed >= capD ? "CAP_REACHED" : "SUCCESS"); 
+                }
+            }
+        }, 1000);
+    }, 600); // 600 Millisekunden reichen der AI-Drosselung (500ms) für ein sauberes Frame-Update
+}
 
     setNewAnchor("Wächter aktiv");
     
