@@ -27,6 +27,16 @@ let llamaLabEndpoint = "";
 let nextEncouragementTimestamp = 0;
 let minEncouragementInterval = 20, maxEncouragementInterval = 40;
 
+// NEU: Hier sauber deklarierte fehlende Variablen
+let initialTargetDuration = 0;
+let realStartTimestamp = 0;
+let startTimeStr = "";
+let lastCheckpointTimestamp = 0;
+let lastAICheckTimestamp = 0;
+let logEvents = [];
+let totalPenaltiesCount = 0;
+let totalPenaltySecondsSum = 0;
+
 // Anpassbare Sprachphrasen
 let phrases = {
     start: "In Position gehen",
@@ -256,7 +266,6 @@ async function startApp() {
     salt = document.getElementById('secretSalt').value;
     isTimerHidden = document.getElementById('hideTimerCheckbox').checked;
     
-    // FIX: Die ID im HTML heißt llamaEndpointInput, hier wird sie jetzt korrekt zugewiesen:
     llamaLabEndpoint = document.getElementById('llamaEndpointInput').value;
 
     const routinePaste = document.getElementById('routineImportInput').value.trim();
@@ -297,22 +306,19 @@ async function startApp() {
     } catch(e) { status.innerText = "Kamerafehler!"; status.style.color = "red"; console.error(e); }
 }
 
-async function initModelAndCountdown() {
+// FIX: Duplizierten Funktionskopf entfernt & Struktur bereinigt
 async function initModelAndCountdown() {
     try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { }
     
     status.innerText = "Lade MediaPipe-Modell...";
     status.style.color = "#ffaa00";
     
-    // 1. ERST das Modell komplett im Hintergrund laden, bevor irgendetwas gezeichnet wird
     detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { 
         runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/' 
     });
     
-    // 2. ERST JETZT, wo das Modell bereit ist, starten wir den Grafik-Loop!
     loop();
     
-    // 3. Countdown für den Nutzer starten
     let setupCountdown = 5;
     status.innerText = `In Position gehen! (${setupCountdown}s)`; 
     speak(phrases.start, true); 
@@ -344,12 +350,10 @@ function initWorkout() {
     startTimeStr = new Date(realStartTimestamp).toLocaleString('de-DE');
     nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
     
-    // EINMALIGER PERFEKT MITTIGER SNAPSHOT (Unter Berücksichtigung der Spiegelung)
     if (Object.keys(latestKeypoints).length > 0) {
         let minX = 257, maxX = 0, minY = 257, maxY = 0, validPoints = 0;
         for (let kp in latestKeypoints) {
             if (latestKeypoints[kp].score > 0.4) {
-                // FIX: Da die Anzeige gespiegelt ist (scale(-1,1)), drehen wir die X-Achse mathematisch um!
                 let kpX = 257 - latestKeypoints[kp].x; 
                 let kpY = latestKeypoints[kp].y;
                 if(kpX < minX) minX = kpX; if(kpX > maxX) maxX = kpX;
@@ -378,7 +382,6 @@ function initWorkout() {
         }
     }
 
-    // Sicherheits-Puffer, damit der Anchor erst nach dem Zoomsprung gesetzt wird
     setTimeout(() => {
         setNewAnchor("Wächter aktiv");
         
@@ -425,11 +428,9 @@ function setNewAnchor(audioMessage) {
     if (audioMessage) speak(audioMessage, true);
 }
 
-// --- Hauptverarbeitung & Starr-Fixierter Kamera-Loop ---
 async function loop() {
     if (appEnded) return; 
     
-    // SICHERHEITSNETZ: Wenn das Video noch gar keine Pixel liefert, Loop abbrechen und aufs nächste Frame warten
     if (!video.videoWidth || video.videoWidth === 0) {
         requestAnimationFrame(loop);
         return;
@@ -492,7 +493,6 @@ async function loop() {
     requestAnimationFrame(loop);
 }
 
-// --- Regel-Überwachung (Flackerfreie Zustandsmaschine) ---
 async function checkRules() {
     if (Date.now() - lastCheckpointTimestamp < 2000) return; 
     if (!detector || !isPrepared || appEnded) return;
@@ -590,7 +590,6 @@ async function checkRules() {
     }
 }
 
-// --- Trainings-Ende & LlamaLab Endpunkt-Übertragung ---
 async function endWorkout(endReason) {
     appEnded = true; 
     clearInterval(workoutInterval); 
