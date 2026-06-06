@@ -362,38 +362,6 @@ async function startAppModelInitialization() {
     }, 1000);
 }
 
-            
-            // Technical Refinement I: Setup Visible Start Countdown Clock
-            let setupCountdown = 5;
-            status.innerText = `In Position gehen! (${setupCountdown}s)`; 
-            status.style.color = "#ffaa00"; 
-            speak(phrases.start, true); 
-            loop();
-            
-            let startTimer = setInterval(() => {
-                setupCountdown--;
-                if (setupCountdown > 0) {
-                    status.innerText = `In Position gehen! (${setupCountdown}s)`;
-                } else {
-                    clearInterval(startTimer);
-                    let result = validateHaltung(); 
-                    if (result.valid) { initWorkout(); } 
-                    else {
-                        status.innerText = result.msg; 
-                        status.style.color = "#ff3333"; 
-                        speak(result.msg, true);
-                        let retryAnchor = setInterval(() => {
-                            let check = validateHaltung(); 
-                            if (check.valid) { initWorkout(); clearInterval(retryAnchor); } 
-                            else { status.innerText = check.msg; }
-                        }, 1000);
-                    }
-                }
-            }, 1000);
-        };
-    } catch(e) { status.innerText = "Kamerafehler!"; status.style.color = "red"; console.error(e); }
-}
-
 function initWorkout() {
     realStartTimestamp = Date.now(); 
     startTimeStr = new Date(realStartTimestamp).toLocaleString('de-DE');
