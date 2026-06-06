@@ -1,0 +1,112 @@
+/* Einheitliches Styling für alle Setup-Komponenten */
+#setupScreen {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: sans-serif;
+}
+
+/* Alle Container für Label + Input gruppieren */
+.form-group {
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #444;
+    font-size: 0.9rem;
+}
+
+/* Textfelder, Selects und Textareas vereinheitlichen */
+#setupScreen input[type="text"],
+#setupScreen input[type="number"],
+#setupScreen input[type="password"],
+#setupScreen select,
+#setupScreen textarea {
+    width: 100%;
+    padding: 10px;
+    margin-top: 2px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box; /* Verhindert, dass Padding die Breite sprengt */
+    font-size: 1rem;
+    background-color: #fff;
+    transition: border-color 0.2s;
+}
+
+#setupScreen input:focus,
+#setupScreen select:focus,
+#setupScreen textarea:focus {
+    border-color: #007bff;
+    outline: none;
+}
+
+/* Spezielles Styling für Textareas (WhatsApp Import) */
+#setupScreen textarea {
+    resize: vertical;
+    min-height: 80px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    background-color: #f8f9fa;
+}
+
+/* Checkbox-Zeilen (Blind-Modus) kompakt halten */
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 15px 0;
+    cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+/* Trennlinien dezent gestalten */
+#setupScreen hr {
+    border: 0;
+    height: 1px;
+    background: #e0e0e0;
+    margin: 25px 0;
+}
+
+/* Hilfstexte unter den Feldern */
+.field-help {
+    display: block;
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 4px;
+}
+
+/* Alle Buttons einheitlich stylen */
+#setupScreen button {
+    width: 100%;
+    padding: 12px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: background-color 0.2s;
+}
+
+#setupScreen button:hover {
+    background-color: #0056b3;
+}
+
+/* WhatsApp Button farblich abheben */
+.btn-whatsapp {
+    background-color: #25D366 !important;
+}
+.btn-whatsapp:hover {
+    background-color: #128C7E !important;
+}
