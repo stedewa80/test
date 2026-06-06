@@ -1,4 +1,4 @@
-// --- DOM Elements ---
+// --- Globale Variablen & Konfigurationen ---
 const video = document.getElementById('webcam'), canvas = document.getElementById('processingCanvas'), ctx = canvas.getContext('2d');
 const container = document.getElementById('camContainer'), status = document.getElementById('status'), timerDisplay = document.getElementById('timerDisplay');
 
@@ -9,24 +9,25 @@ const pts = {
     lK: document.getElementById('ptLKnee'), rK: document.getElementById('ptRKnee'), lF: document.getElementById('ptLFoot'), rF: document.getElementById('ptRFoot')
 };
 
-// --- App Configurations & State Management ---
 let selPos = "", selArm = "", selLeg = "";
 let minD = 30, maxD = 45, capD = 120, minP = 5, maxP = 10, salt = "";
 let detector = null, anchorPose = {}, isPrepared = false, latestKeypoints = {}, baseShoulderWidth = 100, wakeLock = null;
 let timeRemainingSeconds = 30, totalTimeElapsed = 0, workoutInterval = null;
-let staticZoomCoords = null;
 
-// Grace Periods, Timers, and Audio Blocks
+// Grace Periods, Timers, und Audio Blocks
 let isGracePeriodActive = false, gracePeriodEndTime = 0, remainingSecondsCounter = 3, appEnded = false;
-let isAudioSpeakingBlock = false, activeUtterance = null;
+let isAudioSpeakingBlock = false, activeUtterance = null; 
 
-// Feature Flags & Customizations
+// Einmaliger, starrer Zoom-Snapshot Speicher
+let staticZoomCoords = null; 
+
+// Feature-Flags & Anpassungen
 let isTimerHidden = false;
 let llamaLabEndpoint = ""; 
 let nextEncouragementTimestamp = 0;
 let minEncouragementInterval = 20, maxEncouragementInterval = 40;
 
-// Customizable Phrases
+// Anpassbare Sprachphrasen
 let phrases = {
     start: "In Position gehen",
     drift: "Bewegung erkannt bei {joint}. Plus {penalty} Sekunden. Haltung korrigieren.",
@@ -37,7 +38,7 @@ let phrases = {
 };
 let encouragementPhrases = ["Halt durch!", "Sehr gute Haltung!", "Bleib genau so.", "Rücken gerade lassen, perfekt!"];
 
-// Tracking Metadata & Optimization
+// Tracking-Metadaten
 let logEvents = [];
 let startTimeStr = "", initialTargetDuration = 0, totalPenaltiesCount = 0, totalPenaltySecondsSum = 0;
 let realStartTimestamp = 0, lastCheckpointTimestamp = 0, lastAICheckTimestamp = 0;
@@ -49,18 +50,24 @@ const punktNamenDe = {
     'left_foot_index': 'Linke Fußspitze', 'right_foot_index': 'Rechte Fußspitze', 'left_ear': 'Kopf', 'right_ear': 'Kopf'
 };
 
-// --- Custom Component Utilities ---
+// --- Sprachausgabe (Abgesichert gegen Einfrieren) ---
 function speak(text, force = false, callbackOnEnd = null) {
     try {
         if (force) { window.speechSynthesis.cancel(); }
         if (!force && window.speechSynthesis.speaking) { if (callbackOnEnd) callbackOnEnd(); return; }
+        
         activeUtterance = new SpeechSynthesisUtterance(text); 
         activeUtterance.lang = 'de-DE'; 
         activeUtterance.rate = 1.15; 
+        
         activeUtterance.onend = () => { activeUtterance = null; if (callbackOnEnd) callbackOnEnd(); };
         activeUtterance.onerror = () => { activeUtterance = null; if (callbackOnEnd) callbackOnEnd(); };
         window.speechSynthesis.speak(activeUtterance);
-    } catch (e) { console.error("Audio-Fehler", e); activeUtterance = null; if (callbackOnEnd) callbackOnEnd(); }
+    } catch (e) { 
+        console.error("Audio-Fehler", e); 
+        activeUtterance = null; 
+        if (callbackOnEnd) callbackOnEnd(); 
+    }
 }
 
 function formatTime(totalSeconds) {
@@ -113,94 +120,56 @@ async function generateHMAC(text, secret) {
     return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// --- WhatsApp Routine Share Engines (Feature II) ---
+// --- WhatsApp Routinen-Generierung & Import ---
 async function generateRoutineString() {
     try {
-        // 1. Verify that all elements actually exist in your HTML
-        const elPos = document.getElementById('positionSelect');
-        const elArm = document.getElementById('armSelect');
-        const elLeg = document.getElementById('legSelect');
-        const elMin = document.getElementById('minDuration');
-        const elMax = document.getElementById('maxDuration');
-        const elCap = document.getElementById('capDuration');
-        const elSalt = document.getElementById('secretSalt');
+        const secret = document.getElementById('secretSalt').value.trim();
+        if (!secret) { alert("Bitte gib zuerst ein Passwort (Salt) ein!"); return; }
 
-        // Validation check to tell you exactly what is missing in the HTML layout
-        if (!elPos || !elArm || !elLeg || !elMin || !elMax || !elCap || !elSalt) {
-            let missing = [];
-            if (!elPos) missing.push('positionSelect');
-            if (!elArm) missing.push('armSelect');
-            if (!elLeg) missing.push('legSelect');
-            if (!elMin) missing.push('minDuration');
-            if (!elMax) missing.push('maxDuration');
-            if (!elCap) missing.push('capDuration');
-            if (!elSalt) missing.push('secretSalt');
-            
-            alert(`HTML Fehler: Folgende IDs fehlen in deinem Setup-Screen: ${missing.join(', ')}`);
-            return;
-        }
-
-        const secret = elSalt.value.trim();
-        if (!secret) {
-            alert("Bitte gib zuerst einen geheimen Schlüssel (Salt) ein, damit die Routine signiert werden kann!");
-            return;
-        }
-
-        // 2. Build the payload cleanly
         const routineData = {
-            pos: elPos.value,
-            arm: elArm.value,
-            leg: elLeg.value,
-            min: parseInt(elMin.value) || 30,
-            max: parseInt(elMax.value) || 45,
-            cap: parseInt(elCap.value) || 120
+            pos: document.getElementById('positionSelect').value,
+            arm: document.getElementById('armSelect').value,
+            leg: document.getElementById('legSelect').value,
+            min: parseInt(document.getElementById('minDuration').value) || 30,
+            max: parseInt(document.getElementById('maxDuration').value) || 45,
+            cap: parseInt(document.getElementById('capDuration').value) || 120
         };
 
         const rawJson = JSON.stringify(routineData);
         const signature = await generateHMAC(rawJson, secret);
+        const sharePayload = btoa(encodeURIComponent(rawJson)) + "::" + signature;
         
-        // Base64 encoding that safely handles special characters
-        const base64Payload = btoa(encodeURIComponent(rawJson).replace(/%([0-9A-F]{2})/g, (match, p1) => {
-            return String.fromCharCode(parseInt(p1, 16));
-        }));
-        
-        const sharePayload = base64Payload + "::" + signature;
         const textMessage = `Hier ist deine geheime Cornertime-Routine:\n\n${sharePayload}`;
-
-        // 3. Try to open WhatsApp
         const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(textMessage)}`;
-        const newWindow = window.open(whatsappUrl, '_blank');
         
-        // Fallback: If a mobile browser or adblocker blocks the window popup, copy it to clipboard instead
-        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        const newWindow = window.open(whatsappUrl, '_blank');
+        if (!newWindow) {
             await navigator.clipboard.writeText(textMessage);
-            alert("WhatsApp konnte nicht automatisch geöffnet werden (Popup-Blocker). Die Routine wurde stattdessen in deine Zwischenablage kopiert! Du kannst sie jetzt einfach manuell in WhatsApp einfügen (Strg+V / Gedrückt halten).");
+            alert("Routine wurde in die Zwischenablage kopiert! (Popup-Blocker verhinderte WhatsApp)");
         }
-
-    } catch (error) {
-        console.error("Fehler beim Erstellen der Routine:", error);
-        alert(`Ein unerwarteter Fehler ist aufgetreten: ${error.message}`);
-    }
+    } catch(e) { alert("Fehler beim Erstellen der Routine: " + e.message); }
 }
 
 async function loadImportedRoutine(payload) {
     try {
         const parts = payload.split("::");
         if(parts.length !== 2) return false;
-        const secret = document.getElementById('secretSalt').value;
-        const decodedJson = decodeURIComponent(escape(atob(parts[0])));
+        const secret = document.getElementById('secretSalt').value.trim();
+        if (!secret) { alert("Bitte gib das passende Passwort ein, um die Routine zu entschlüsseln!"); return false; }
+        
+        const decodedJson = decodeURIComponent(atob(parts[0]));
         const computedSig = await generateHMAC(decodedJson, secret);
         
-        if (computedSig !== parts[1]) { alert("Routine-Signatur ungültig! Falsches Passwort?"); return false; }
+        if (computedSig !== parts[1]) { alert("Ungültige Signatur! Falsches Passwort oder manipulierte Routine."); return false; }
         
         const routine = JSON.parse(decodedJson);
         selPos = routine.pos; selArm = routine.arm; selLeg = routine.leg;
         minD = routine.min; maxD = routine.max; capD = routine.cap;
         return true;
-    } catch(e) { console.error(e); return false; }
+    } catch(e) { alert("Import-Fehler: Ungültiges Format!"); return false; }
 }
 
-// --- Posture Core Validation Rules ---
+// --- Haltungs-Validierung ---
 function validateHaltung() {
     if (!f('left_shoulder') || !f('right_shoulder')) return { valid: false, msg: "Körper nicht im Bild" };
     const sb = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
@@ -282,7 +251,7 @@ function validateHaltung() {
     return { valid: true, msg: "Überwachung aktiv! 🟢" };
 }
 
-// --- App Entry & Setup Flow ---
+// --- App Start & Initialisierung ---
 async function startApp() {
     salt = document.getElementById('secretSalt').value;
     isTimerHidden = document.getElementById('hideTimerCheckbox').checked;
@@ -316,26 +285,22 @@ async function startApp() {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } }); 
         video.srcObject = stream;
         
-        // This structural setup prevents camera geometry failures
         video.onloadedmetadata = async () => {
             if (video.videoWidth === 0 || video.videoHeight === 0) {
-                video.addEventListener('loadeddata', () => startAppModelInitialization());
+                video.addEventListener('loadeddata', () => initModelAndCountdown());
             } else {
-                startAppModelInitialization();
+                initModelAndCountdown();
             }
         };
     } catch(e) { status.innerText = "Kamerafehler!"; status.style.color = "red"; console.error(e); }
 }
 
-// MAKE SURE THIS IS A COMPLETELY SEPARATE FUNCTION STANDING INDEPENDENTLY Outside startApp()
-async function startAppModelInitialization() {
+async function initModelAndCountdown() {
     try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { }
-    
     status.innerText = "Lade MediaPipe-Modell...";
+    
     detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { 
-        runtime: 'mediapipe', 
-        modelType: 'lite', 
-        solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/'
+        runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/' 
     });
     
     let setupCountdown = 5;
@@ -371,7 +336,7 @@ function initWorkout() {
     startTimeStr = new Date(realStartTimestamp).toLocaleString('de-DE');
     nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
     
-    // EINMALIGER ZOOM-SNAKESHOT: Berechne die Bounding-Box basierend auf deiner aktuellen Position
+    // EINMALIGER PERFEKT ZENTRIERTER SNAPSHOT NACH COUNTDOWN
     if (Object.keys(latestKeypoints).length > 0) {
         let minX = 257, maxX = 0, minY = 257, maxY = 0, validPoints = 0;
         for (let kp in latestKeypoints) {
@@ -382,23 +347,24 @@ function initWorkout() {
                 validPoints++;
             }
         }
-        // Wenn genügend Punkte da sind, frieren wir den Ausschnitt ein
         if (validPoints > 4) {
             let boxW = (maxX - minX); let boxH = (maxY - minY);
-            let cx = minX + boxW/2; let cy = minY + boxH/2;
-            let size = Math.max(boxW, boxH) * 1.35; // 35% Puffer
+            let cx = minX + (boxW / 2); let cy = minY + (boxH / 2);
+            let size = Math.max(boxW, boxH) * 1.35; 
             
-            let normSize = size / 257;
             let videoMinDim = Math.min(video.videoWidth, video.videoHeight);
-            let sWidth = Math.min(videoMinDim, videoMinDim * normSize);
+            let scaleFactor = videoMinDim / 257;
+            let sWidth = Math.min(videoMinDim, size * scaleFactor);
+            
+            let videoLeftOffset = (video.videoWidth - videoMinDim) / 2;
+            let videoTopOffset = (video.videoHeight - videoMinDim) / 2;
             
             staticZoomCoords = {
-                sx: Math.max(0, Math.min(video.videoWidth - sWidth, (cx / 257) * video.videoWidth - sWidth / 2)),
-                sy: Math.max(0, Math.min(video.videoHeight - sWidth, (cy / 257) * video.videoHeight - sWidth / 2)),
+                sx: Math.max(videoLeftOffset, Math.min(video.videoWidth - sWidth - videoLeftOffset, videoLeftOffset + (cx * scaleFactor) - (sWidth / 2))),
+                sy: Math.max(videoTopOffset, Math.min(video.videoHeight - sWidth - videoTopOffset, videoTopOffset + (cy * scaleFactor) - (sWidth / 2))),
                 sWidth: sWidth,
                 sHeight: sWidth
             };
-            console.log("Zoom-Ausschnitt einmalig eingefroren:", staticZoomCoords);
         }
     }
 
@@ -426,8 +392,6 @@ function initWorkout() {
 }
 
 function setNewAnchor(audioMessage) {
-    if (audioMessage === "Checkpoint") { staticZoomCoords = null; } 
-    
     anchorPose = {};
     if (f('left_shoulder') && f('right_shoulder')) {
         baseShoulderWidth = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
@@ -448,7 +412,7 @@ function setNewAnchor(audioMessage) {
     if (audioMessage) speak(audioMessage, true);
 }
 
-// --- High Performance Camera Processing & Zoom Rendering Loop ---
+// --- Hauptverarbeitung & Starr-Fixierter Kamera-Loop ---
 async function loop() {
     if (appEnded) return; 
     canvas.width = 257; 
@@ -456,19 +420,15 @@ async function loop() {
     
     let sx = 0, sy = 0, sWidth = video.videoWidth, sHeight = video.videoHeight;
 
-    // Nutze den statischen Zoom, falls er bereits nach den 5 Sekunden berechnet wurde
     if (staticZoomCoords) {
         sx = staticZoomCoords.sx;
         sy = staticZoomCoords.sy;
         sWidth = staticZoomCoords.sWidth;
         sHeight = staticZoomCoords.sHeight;
     } else {
-        // Fallback für die ersten 5 Sekunden (Standard-Quadrat)
         const minDim = Math.min(video.videoWidth, video.videoHeight || 480);
-        sx = (video.videoWidth - minDim) / 2; 
-        sy = (video.videoHeight - minDim) / 2;
-        sWidth = minDim; 
-        sHeight = minDim;
+        sx = (video.videoWidth - minDim) / 2; sy = (video.videoHeight - minDim) / 2;
+        sWidth = minDim; sHeight = minDim;
     }
 
     ctx.save(); 
@@ -477,14 +437,14 @@ async function loop() {
     ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, 257, 257); 
     ctx.restore();
     
-    // Technical Refinement II: Run AI Estimations at a Fixed 500ms Interval (Saves Battery)
+    // AKKUDROSSELUNG: AI schont CPU/Batterie durch 500ms Intervalle
     if (detector && video.readyState >= 2 && Date.now() - lastAICheckTimestamp >= 500) { 
         lastAICheckTimestamp = Date.now();
         const poses = await detector.estimatePoses(canvas); 
         if (poses && poses.length > 0) { 
             poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; }); 
         } 
-        await checkRules(); // Sync rule execution exactly with the updated AI tracking frame
+        await checkRules(); 
     }
     
     let cW = container.clientWidth; let cH = container.clientHeight;
@@ -513,15 +473,17 @@ async function loop() {
     requestAnimationFrame(loop);
 }
 
-// --- Evaluator State Engine ---
+// --- Regel-Überwachung (Flackerfreie Zustandsmaschine) ---
 async function checkRules() {
     if (Date.now() - lastCheckpointTimestamp < 2000) return; 
     if (!detector || !isPrepared || appEnded) return;
     
     if (isAudioSpeakingBlock) {
-        status.innerText = "Haltung verletzt! Bitte zuhören... ⏳";
-        status.style.color = "#ffaa00"; 
-        container.style.borderColor = "#ffaa00";
+        if (!isGracePeriodActive) {
+            status.innerText = "Haltung verletzt! Bitte zuhören... ⏳";
+            status.style.color = "#ffaa00"; 
+            container.style.borderColor = "#ffaa00";
+        }
         return; 
     }
 
@@ -553,19 +515,18 @@ async function checkRules() {
                 updateTimerUI();
                 
                 const timeStamp = new Date().toLocaleTimeString('de-DE'); 
-                logEvents.push(`[${timeStamp}] ESKALATION: Haltung falsch (${check.msg}) -> FOLGE-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
+                logEvents.push(`[${timeStamp}] ESKALATION: Haltung falsch (${check.msg}) -> FOLGE-STRAFE: +${penalty}s`);
                 
                 status.innerText = `${check.msg.toUpperCase()}! +${penalty}s! ⏳`; 
                 status.style.color = "#ff3333"; 
                 if(!isTimerHidden) timerDisplay.style.color = "#ff3333";
                 
                 isAudioSpeakingBlock = true;
-                // Feature V: Custom Phrase Rendering via template strings
                 let utteranceText = phrases.escalation.replace("{msg}", check.msg).replace("{penalty}", penalty);
                 speak(utteranceText, true, () => {
                     isAudioSpeakingBlock = false;
                     remainingSecondsCounter = 3; 
-                    gracePeriodEndTime = Date.now() + 3000;
+                    gracePeriodEndTime = Date.now() + 3000; // Countdown friert erst nach Audio ein
                 });
             }
         }
@@ -592,7 +553,6 @@ async function checkRules() {
         isGracePeriodActive = true; 
         isAudioSpeakingBlock = true; 
         remainingSecondsCounter = 3;
-        gracePeriodEndTime = Date.now() + 3000;
         
         let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP; 
         timeRemainingSeconds += penalty; 
@@ -601,18 +561,17 @@ async function checkRules() {
         updateTimerUI();
         
         const timeStamp = new Date().toLocaleTimeString('de-DE'); 
-        logEvents.push(`[${timeStamp}] DRIFT: Bewegung erkannt bei [${brokenJoint}] -> SOFORT-STRAFE: +${penalty}s (Uhr auf ${formatTime(timeRemainingSeconds)})`);
+        logEvents.push(`[${timeStamp}] DRIFT: Bewegung erkannt bei [${brokenJoint}] -> SOFORT-STRAFE: +${penalty}s`);
         
-        // Feature V: Custom Phrase Rendering via template strings
         let utteranceText = phrases.drift.replace("{joint}", brokenJoint).replace("{penalty}", penalty);
         speak(utteranceText, true, () => {
             isAudioSpeakingBlock = false; 
-            gracePeriodEndTime = Date.now() + 3000; 
+            gracePeriodEndTime = Date.now() + 3000; // Countdown friert erst nach Audio ein
         }); 
     }
 }
 
-// --- Completion and Termination Handling ---
+// --- Trainings-Ende & LlamaLab Android-Webhook Integration ---
 async function endWorkout(endReason) {
     appEnded = true; 
     clearInterval(workoutInterval); 
@@ -648,13 +607,13 @@ async function endWorkout(endReason) {
     if(endReason === "SUCCESS") { 
         speak(phrases.success, true); 
         
-        // Feature IV: Automated LlamaLab Flow Trigger Integration via Webhook
-        if (llamaLabEndpoint.trim() !== "") {
+        // Android LlamaLab Flow Trigger via Webhook
+        if (llamaLabEndpoint && llamaLabEndpoint.trim() !== "") {
             fetch(llamaLabEndpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: "SUCCESS", signature: hash, user: "Buddy" })
-            }).catch(err => console.error("LlamaLab Webhook communication failed:", err));
+                body: JSON.stringify({ status: "SUCCESS", signature: hash })
+            }).catch(err => console.error("LlamaLab Webhook Fehler:", err));
         }
     } else { 
         speak(phrases.capReached, true); 
