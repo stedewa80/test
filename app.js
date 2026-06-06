@@ -14,6 +14,7 @@ let selPos = "", selArm = "", selLeg = "";
 let minD = 30, maxD = 45, capD = 120, minP = 5, maxP = 10, salt = "";
 let detector = null, anchorPose = {}, isPrepared = false, latestKeypoints = {}, baseShoulderWidth = 100, wakeLock = null;
 let timeRemainingSeconds = 30, totalTimeElapsed = 0, workoutInterval = null;
+let staticZoomCoords = null;
 
 // Grace Periods, Timers, and Audio Blocks
 let isGracePeriodActive = false, gracePeriodEndTime = 0, remainingSecondsCounter = 3, appEnded = false;
@@ -369,6 +370,38 @@ function initWorkout() {
     realStartTimestamp = Date.now(); 
     startTimeStr = new Date(realStartTimestamp).toLocaleString('de-DE');
     nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
+    
+    // EINMALIGER ZOOM-SNAKESHOT: Berechne die Bounding-Box basierend auf deiner aktuellen Position
+    if (Object.keys(latestKeypoints).length > 0) {
+        let minX = 257, maxX = 0, minY = 257, maxY = 0, validPoints = 0;
+        for (let kp in latestKeypoints) {
+            if (latestKeypoints[kp].score > 0.4) {
+                let kpX = latestKeypoints[kp].x; let kpY = latestKeypoints[kp].y;
+                if(kpX < minX) minX = kpX; if(kpX > maxX) maxX = kpX;
+                if(kpY < minY) minY = kpY; if(kpY > maxY) maxY = kpY;
+                validPoints++;
+            }
+        }
+        // Wenn genügend Punkte da sind, frieren wir den Ausschnitt ein
+        if (validPoints > 4) {
+            let boxW = (maxX - minX); let boxH = (maxY - minY);
+            let cx = minX + boxW/2; let cy = minY + boxH/2;
+            let size = Math.max(boxW, boxH) * 1.35; // 35% Puffer
+            
+            let normSize = size / 257;
+            let videoMinDim = Math.min(video.videoWidth, video.videoHeight);
+            let sWidth = Math.min(videoMinDim, videoMinDim * normSize);
+            
+            staticZoomCoords = {
+                sx: Math.max(0, Math.min(video.videoWidth - sWidth, (cx / 257) * video.videoWidth - sWidth / 2)),
+                sy: Math.max(0, Math.min(video.videoHeight - sWidth, (cy / 257) * video.videoHeight - sWidth / 2)),
+                sWidth: sWidth,
+                sHeight: sWidth
+            };
+            console.log("Zoom-Ausschnitt einmalig eingefroren:", staticZoomCoords);
+        }
+    }
+
     setNewAnchor("Wächter aktiv");
     
     workoutInterval = setInterval(() => {
@@ -379,7 +412,6 @@ function initWorkout() {
                 updateTimerUI(); 
             }
             
-            // Feature V: Pure Encouragement Engine Integration
             if (!isGracePeriodActive && !isAudioSpeakingBlock && Date.now() >= nextEncouragementTimestamp) {
                 let randomPhrase = encouragementPhrases[Math.floor(Math.random() * encouragementPhrases.length)];
                 speak(randomPhrase, false);
@@ -394,6 +426,8 @@ function initWorkout() {
 }
 
 function setNewAnchor(audioMessage) {
+    if (audioMessage === "Checkpoint") { staticZoomCoords = null; } 
+    
     anchorPose = {};
     if (f('left_shoulder') && f('right_shoulder')) {
         baseShoulderWidth = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
@@ -422,34 +456,19 @@ async function loop() {
     
     let sx = 0, sy = 0, sWidth = video.videoWidth, sHeight = video.videoHeight;
 
-    // Feature I: Smart Body Bounding-Box Zoom Engine Calculation
-    if (isPrepared && Object.keys(latestKeypoints).length > 0) {
-        let minX = 257, maxX = 0, minY = 257, maxY = 0, validPoints = 0;
-        for (let kp in latestKeypoints) {
-            if (latestKeypoints[kp].score > 0.4) {
-                let kpX = latestKeypoints[kp].x; let kpY = latestKeypoints[kp].y;
-                if(kpX < minX) minX = kpX; if(kpX > maxX) maxX = kpX;
-                if(kpY < minY) minY = kpY; if(kpY > maxY) maxY = kpY;
-                validPoints++;
-            }
-        }
-        if (validPoints > 4) {
-            let boxW = (maxX - minX); let boxH = (maxY - minY);
-            let cx = minX + boxW/2; let cy = minY + boxH/2;
-            let size = Math.max(boxW, boxH) * 1.35; // Add a clean 35% margin boundary buffer
-            
-            // Standardize video frame scale parameters
-            let normSize = size / 257;
-            let videoMinDim = Math.min(video.videoWidth, video.videoHeight);
-            sWidth = Math.min(videoMinDim, videoMinDim * normSize);
-            sHeight = sWidth;
-            sx = Math.max(0, Math.min(video.videoWidth - sWidth, (cx / 257) * video.videoWidth - sWidth / 2));
-            sy = Math.max(0, Math.min(video.videoHeight - sHeight, (cy / 257) * video.videoHeight - sHeight / 2));
-        }
+    // Nutze den statischen Zoom, falls er bereits nach den 5 Sekunden berechnet wurde
+    if (staticZoomCoords) {
+        sx = staticZoomCoords.sx;
+        sy = staticZoomCoords.sy;
+        sWidth = staticZoomCoords.sWidth;
+        sHeight = staticZoomCoords.sHeight;
     } else {
+        // Fallback für die ersten 5 Sekunden (Standard-Quadrat)
         const minDim = Math.min(video.videoWidth, video.videoHeight || 480);
-        sx = (video.videoWidth - minDim) / 2; sy = (video.videoHeight - minDim) / 2;
-        sWidth = minDim; sHeight = minDim;
+        sx = (video.videoWidth - minDim) / 2; 
+        sy = (video.videoHeight - minDim) / 2;
+        sWidth = minDim; 
+        sHeight = minDim;
     }
 
     ctx.save(); 
