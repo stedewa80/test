@@ -298,18 +298,24 @@ async function startApp() {
 }
 
 async function initModelAndCountdown() {
+async function initModelAndCountdown() {
     try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { }
-    status.innerText = "Lade MediaPipe-Modell...";
     
+    status.innerText = "Lade MediaPipe-Modell...";
+    status.style.color = "#ffaa00";
+    
+    // 1. ERST das Modell komplett im Hintergrund laden, bevor irgendetwas gezeichnet wird
     detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { 
         runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/' 
     });
     
+    // 2. ERST JETZT, wo das Modell bereit ist, starten wir den Grafik-Loop!
+    loop();
+    
+    // 3. Countdown für den Nutzer starten
     let setupCountdown = 5;
     status.innerText = `In Position gehen! (${setupCountdown}s)`; 
-    status.style.color = "#ffaa00"; 
     speak(phrases.start, true); 
-    loop();
     
     let startTimer = setInterval(() => {
         setupCountdown--;
@@ -422,6 +428,13 @@ function setNewAnchor(audioMessage) {
 // --- Hauptverarbeitung & Starr-Fixierter Kamera-Loop ---
 async function loop() {
     if (appEnded) return; 
+    
+    // SICHERHEITSNETZ: Wenn das Video noch gar keine Pixel liefert, Loop abbrechen und aufs nächste Frame warten
+    if (!video.videoWidth || video.videoWidth === 0) {
+        requestAnimationFrame(loop);
+        return;
+    }
+    
     canvas.width = 257; 
     canvas.height = 257;
     
