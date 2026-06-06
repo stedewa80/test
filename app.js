@@ -38,16 +38,16 @@ let phrases = {
 };
 let encouragementPhrases = ["Halt durch!", "Sehr gute Haltung!", "Bleib genau so.", "Rücken gerade lassen, perfekt!"];
 
-// Tracking-Metadaten
-let logEvents = [];
-let startTimeStr = "", initialTargetDuration = 0, totalPenaltiesCount = 0, totalPenaltySecondsSum = 0;
-let realStartTimestamp = 0, lastCheckpointTimestamp = 0, lastAICheckTimestamp = 0;
-
+// HIER SIND LINKS UND RECHTS FÜR DEN SPIEGEL-MODUS DIREKT VERTAUSCHT
 const punktNamenDe = {
-    'left_shoulder': 'Linke Schulter', 'right_shoulder': 'Rechte Schulter', 'left_elbow': 'Linker Ellbogen', 'right_elbow': 'Rechter Ellbogen',
-    'left_wrist': 'Linkes Handgelenk', 'right_wrist': 'Rechtes Handgelenk', 'left_hip': 'Linke Hüfte', 'right_hip': 'Rechte Hüfte',
-    'left_knee': 'Linkes Knie', 'right_knee': 'Rechtes Knie', 'left_heel': 'Linke Ferse', 'right_heel': 'Rechte Ferse',
-    'left_foot_index': 'Linke Fußspitze', 'right_foot_index': 'Rechte Fußspitze', 'left_ear': 'Kopf', 'right_ear': 'Kopf'
+    'left_shoulder': 'Rechte Schulter', 'right_shoulder': 'Linke Schulter', 
+    'left_elbow': 'Rechter Ellbogen', 'right_elbow': 'Linker Ellbogen',
+    'left_wrist': 'Rechtes Handgelenk', 'right_wrist': 'Linkes Handgelenk', 
+    'left_hip': 'Rechte Hüfte', 'right_hip': 'Linke Hüfte',
+    'left_knee': 'Rechtes Knie', 'right_knee': 'Linkes Knie', 
+    'left_heel': 'Rechte Ferse', 'right_heel': 'Linke Ferse',
+    'left_foot_index': 'Rechte Fußspitze', 'right_foot_index': 'Linke Fußspitze', 
+    'left_ear': 'Kopf', 'right_ear': 'Kopf'
 };
 
 // --- Sprachausgabe (Abgesichert gegen Einfrieren) ---
@@ -255,6 +255,8 @@ function validateHaltung() {
 async function startApp() {
     salt = document.getElementById('secretSalt').value;
     isTimerHidden = document.getElementById('hideTimerCheckbox').checked;
+    
+    // FIX: Die ID im HTML heißt llamaEndpointInput, hier wird sie jetzt korrekt zugewiesen:
     llamaLabEndpoint = document.getElementById('llamaEndpointInput').value;
 
     const routinePaste = document.getElementById('routineImportInput').value.trim();
@@ -336,12 +338,14 @@ function initWorkout() {
     startTimeStr = new Date(realStartTimestamp).toLocaleString('de-DE');
     nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
     
-    // 1. EINMALIGER PERFEKT ZENTRIERTER SNAPSHOT NACH COUNTDOWN
+    // EINMALIGER PERFEKT MITTIGER SNAPSHOT (Unter Berücksichtigung der Spiegelung)
     if (Object.keys(latestKeypoints).length > 0) {
         let minX = 257, maxX = 0, minY = 257, maxY = 0, validPoints = 0;
         for (let kp in latestKeypoints) {
             if (latestKeypoints[kp].score > 0.4) {
-                let kpX = latestKeypoints[kp].x; let kpY = latestKeypoints[kp].y;
+                // FIX: Da die Anzeige gespiegelt ist (scale(-1,1)), drehen wir die X-Achse mathematisch um!
+                let kpX = 257 - latestKeypoints[kp].x; 
+                let kpY = latestKeypoints[kp].y;
                 if(kpX < minX) minX = kpX; if(kpX > maxX) maxX = kpX;
                 if(kpY < minY) minY = kpY; if(kpY > maxY) maxY = kpY;
                 validPoints++;
@@ -368,8 +372,7 @@ function initWorkout() {
         }
     }
 
-    // 2. TIMEOUT-PUFFER: Warte 600ms, bis die KI den neuen Bildausschnitt erfasst hat,
-    // erst DANN wird der unbestechliche Haltungs-Anchor scharfgeschaltet!
+    // Sicherheits-Puffer, damit der Anchor erst nach dem Zoomsprung gesetzt wird
     setTimeout(() => {
         setNewAnchor("Wächter aktiv");
         
@@ -392,29 +395,7 @@ function initWorkout() {
                 }
             }
         }, 1000);
-    }, 600); // 600 Millisekunden reichen der AI-Drosselung (500ms) für ein sauberes Frame-Update
-
-    setNewAnchor("Wächter aktiv");
-    
-    workoutInterval = setInterval(() => {
-        if (isPrepared && !appEnded) {
-            totalTimeElapsed++;
-            if (!isGracePeriodActive && !isAudioSpeakingBlock) { 
-                timeRemainingSeconds--; 
-                updateTimerUI(); 
-            }
-            
-            if (!isGracePeriodActive && !isAudioSpeakingBlock && Date.now() >= nextEncouragementTimestamp) {
-                let randomPhrase = encouragementPhrases[Math.floor(Math.random() * encouragementPhrases.length)];
-                speak(randomPhrase, false);
-                nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
-            }
-
-            if (totalTimeElapsed >= capD || timeRemainingSeconds <= 0) { 
-                endWorkout(totalTimeElapsed >= capD ? "CAP_REACHED" : "SUCCESS"); 
-            }
-        }
-    }, 1000);
+    }, 600);
 }
 
 function setNewAnchor(audioMessage) {
@@ -463,7 +444,6 @@ async function loop() {
     ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, 257, 257); 
     ctx.restore();
     
-    // AKKUDROSSELUNG: AI schont CPU/Batterie durch 500ms Intervalle
     if (detector && video.readyState >= 2 && Date.now() - lastAICheckTimestamp >= 500) { 
         lastAICheckTimestamp = Date.now();
         const poses = await detector.estimatePoses(canvas); 
@@ -552,7 +532,7 @@ async function checkRules() {
                 speak(utteranceText, true, () => {
                     isAudioSpeakingBlock = false;
                     remainingSecondsCounter = 3; 
-                    gracePeriodEndTime = Date.now() + 3000; // Countdown friert erst nach Audio ein
+                    gracePeriodEndTime = Date.now() + 3000; 
                 });
             }
         }
@@ -592,12 +572,12 @@ async function checkRules() {
         let utteranceText = phrases.drift.replace("{joint}", brokenJoint).replace("{penalty}", penalty);
         speak(utteranceText, true, () => {
             isAudioSpeakingBlock = false; 
-            gracePeriodEndTime = Date.now() + 3000; // Countdown friert erst nach Audio ein
+            gracePeriodEndTime = Date.now() + 3000; 
         }); 
     }
 }
 
-// --- Trainings-Ende & LlamaLab Android-Webhook Integration ---
+// --- Trainings-Ende & LlamaLab Endpunkt-Übertragung ---
 async function endWorkout(endReason) {
     appEnded = true; 
     clearInterval(workoutInterval); 
@@ -633,7 +613,6 @@ async function endWorkout(endReason) {
     if(endReason === "SUCCESS") { 
         speak(phrases.success, true); 
         
-        // Android LlamaLab Flow Trigger via Webhook
         if (llamaLabEndpoint && llamaLabEndpoint.trim() !== "") {
             fetch(llamaLabEndpoint, {
                 method: 'POST',
