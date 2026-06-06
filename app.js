@@ -382,8 +382,14 @@ function initWorkout() {
         }
     }
 
+        // Sicherheits-Puffer erhöhen und KI erst "einschwingen" lassen
     setTimeout(() => {
+        // 1. Anchor mit den absolut frischesten, stabilisierten Punkten setzen
         setNewAnchor("Wächter aktiv");
+        
+        // 2. Den Zeitstempel für den letzten Checkpoint künstlich in die Zukunft verschieben!
+        // Dadurch hat checkRules() eine zusätzliche Sperre von 3 Sekunden, bevor es anschlagen darf.
+        lastCheckpointTimestamp = Date.now() + 3000; 
         
         workoutInterval = setInterval(() => {
             if (isPrepared && !appEnded) {
@@ -404,7 +410,7 @@ function initWorkout() {
                 }
             }
         }, 1000);
-    }, 600);
+    }, 1500); // Von 600ms auf 1500ms erhöht, damit das Kamerabild garantiert stabil ist
 }
 
 function setNewAnchor(audioMessage) {
