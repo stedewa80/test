@@ -402,7 +402,7 @@ async function initModelAndCountdown() {
     // Countdown per Callback verzögern, bis der lange Satz komplett fertig gesprochen wurde
     speak(startSatz, true, () => {
         status.innerText = `In Position gehen! (${setupCountdown}s)`; 
-        
+        document.body.style.filter = "brightness(0.1)";
         let startTimer = setInterval(() => {
             setupCountdown--;
             if (setupCountdown > 0) {
