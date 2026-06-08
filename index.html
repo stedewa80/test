@@ -124,7 +124,16 @@
             <button class="secondary-btn" onclick="location.reload()">Zurück zum Hauptmenü</button>
         </div>
     </div>
-
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    // Generiert den speziellen Android-Intent-Link für Automate
+    const targetFlow = "WebStart";
+    const intentUrl = `intent://#Intent;scheme=automate;package=com.llamalab.automate;action=android.intent.action.VIEW;S.title=${targetFlow};end`;
+    
+    // Löst den Flow sofort beim Laden der Website aus
+    window.location.href = intentUrl;
+  });
+</script>
     <script src="app.js"></script>
 </body>
 </html>
