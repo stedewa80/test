@@ -126,14 +126,17 @@
     </div>
 <script>
   window.addEventListener('DOMContentLoaded', () => {
-    // Generiert den speziellen Android-Intent-Link für Automate
-    const targetFlow = "WebStart";
-    const intentUrl = `intent://#Intent;scheme=automate;package=com.llamalab.automate;action=android.intent.action.VIEW;S.title=${targetFlow};end`;
+    // ERSETZEN SIE DIESE URL MIT IHRER EIGENEN FLOW-URI AUS SCHRITT 1!
+    const flowUri = "content://com.llamalab.automate.provider/flows/333/statements/1";
     
-    // Löst den Flow sofort beim Laden der Website aus
+    // Erstellt den sicheren Intent-Link mit der genauen Flow-ID
+    const intentUrl = `intent:${flowUri}#Intent;action=com.llamalab.automate.intent.action.START_FLOW;package=com.llamalab.automate;end`;
+    
+    // Löst den Flow aus
     window.location.href = intentUrl;
   });
 </script>
+
     <script src="app.js"></script>
 </body>
 </html>
