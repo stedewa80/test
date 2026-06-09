@@ -197,12 +197,12 @@ button.whatsapp-btn {
     background: #25D366;
     color: white;
     border: none;
-    padding: 14px;
-    font-size: 1.1rem;
+    padding: 12px;
+    font-size: 1rem;
     font-weight: bold;
-    border-radius: 12px;
+    border-radius: 10px;
     cursor: pointer;
-    margin-top: 5px;
+    margin-top: 10px;
     width: 100%;
     box-shadow: 0 4px 10px rgba(37,211,102,0.2);
     transition: background 0.2s;
