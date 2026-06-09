@@ -57,9 +57,6 @@
                 <div class="col"><label>Max Strafe</label><input type="number" id="maxPenalty" class="custom-input" value="10"></div>
             </div>
 
-            <h3>Buddy Fälschungsschutz</h3>
-            <label for="secretSalt">Gemeinsames Geheimwort (Salt)</label>
-            <input type="text" id="secretSalt" class="custom-input" value="schweinehundbezwingen2026">
             
             <!-- NEU: Blind-Modus und LlamaLab nahtlos integriert -->
             <h3>Erweiterte Optionen</h3>
@@ -71,15 +68,17 @@
             <label for="llamaEndpointInput" style="margin-top: 12px; display: block;">LlamaLab Automate Endpunkt (Optional)</label>
             <input type="text" id="llamaEndpointInput" class="custom-input" placeholder="http://192.168.x.x:8080/endpoint">
 
-            <hr>
+            <h3>Buddy Fälschungsschutz</h3>
+            <label for="secretSalt">Gemeinsames Geheimwort (Salt)</label>
+            <input type="text" id="secretSalt" class="custom-input" value="schweinehundbezwingen2026">
             
             <h3>WhatsApp Routine-Tausch</h3>
             <label for="routineImportInput">Geheime Routine importieren</label>
             <textarea id="routineImportInput" class="log-output" style="height: 80px; margin-bottom: 10px;" placeholder="Füge hier den Code deines Buddies ein..."></textarea>
 
             <button class="start-btn" onclick="startApp()">WÄCHTER AKTIVIEREN</button>
+            <button class="whatsapp-btn" onclick="generateRoutineString()">Routine per WhatsApp teilen</button>
             <button class="secondary-btn" onclick="showVerificationOption()">Logfile verifizieren (Buddy-Modus)</button>
-            <button class="whatsapp-btn" onclick="generateRoutineString()">Routine erstellen & per WhatsApp senden</button>
         </div>
         
         <div id="activeScreen">
