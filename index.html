@@ -30,7 +30,15 @@
             <a href="intent:#Intent;action=com.meinprojekt.CUSTOM_BROADCAST;package=com.llamalab.automate;S.nachricht=Erfolgreich;end">
    Broadcast an Automate senden
 </a>
+<form action="ok">
+      <input name="filter" id="filter" size="32" type="text" autocapitalize="none" placeholder="message"><br>
+<input type="radio" id="toast" name="method" value="toast">
+      <label for="toast">toast</label>
+      <input type="radio" id="not" name="method" value="not" checked>
+      <label for="not">notification</label><br>
+    </form>
 
+<button type="button" onclick="window.location.href='automate:[&quot;'+document.querySelector('input[name=method]:checked').value+'&quot;, &quot;'+document.getElementById('filter').value+'&quot;]';">Send to AM</button>
 
 
             <h3>Haltungs-Matrix</h3>
