@@ -71,15 +71,14 @@
             <label for="llamaEndpointInput" style="margin-top: 12px; display: block;">LlamaLab Automate Endpunkt (Optional)</label>
             <input type="text" id="llamaEndpointInput" class="custom-input" placeholder="http://192.168.x.x:8080/endpoint">
 
-            <button class="start-btn" onclick="startApp()">WÄCHTER AKTIVIEREN</button>
-            <button class="secondary-btn" onclick="showVerificationOption()">Logfile verifizieren (Buddy-Modus)</button>
-            
             <hr>
             
-            <!-- NEU: Routine-Import / Export passend zu deinem alten Stil -->
             <h3>WhatsApp Routine-Tausch</h3>
             <label for="routineImportInput">Geheime Routine importieren</label>
             <textarea id="routineImportInput" class="log-output" style="height: 80px; margin-bottom: 10px;" placeholder="Füge hier den Code deines Buddies ein..."></textarea>
+
+            <button class="start-btn" onclick="startApp()">WÄCHTER AKTIVIEREN</button>
+            <button class="secondary-btn" onclick="showVerificationOption()">Logfile verifizieren (Buddy-Modus)</button>
             <button class="whatsapp-btn" onclick="generateRoutineString()">Routine erstellen & per WhatsApp senden</button>
         </div>
         
