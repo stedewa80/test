@@ -402,7 +402,7 @@ async function initModelAndCountdown() {
     // Countdown per Callback verzögern, bis der lange Satz komplett fertig gesprochen wurde
     speak(startSatz, true, () => {
         status.innerText = `In Position gehen! (${setupCountdown}s)`; 
-        document.body.style.filter = "brightness(0.1)";
+        
         let startTimer = setInterval(() => {
             setupCountdown--;
             if (setupCountdown > 0) {
@@ -513,6 +513,7 @@ function setNewAnchor(audioMessage) {
     timerDisplay.style.color = "#ffffff"; 
     container.style.borderColor = "#333333";
     if (audioMessage) speak(audioMessage, true);
+    document.body.style.filter = "brightness(0.1)";
 }
 
 // =========================================================================
@@ -670,6 +671,8 @@ async function checkRules() {
         const timeStamp = new Date().toLocaleTimeString('de-DE'); 
         logEvents.push(`[${timeStamp}] DRIFT: Bewegung erkannt bei [${brokenJoint}] -> SOFORT-STRAFE: +${penalty}s`);
         
+        document.body.style.filter = none;
+        
         let utteranceText = phrases.drift.replace("{joint}", brokenJoint).replace("{penalty}", penalty);
         speak(utteranceText, true, () => {
             isAudioSpeakingBlock = false; 
@@ -712,6 +715,8 @@ async function endWorkout(endReason) {
     clearInterval(workoutInterval); 
     isPrepared = false; 
     if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
+
+    document.body.style.filter = none;
     
     const endTimestamp = Date.now(); 
     const endTimeStr = new Date(endTimestamp).toLocaleString('de-DE');
