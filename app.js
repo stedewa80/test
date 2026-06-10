@@ -323,7 +323,7 @@ function validateHaltung() {
 async function startApp() {
     salt = document.getElementById('secretSalt').value;
     isTimerHidden = document.getElementById('hideTimerCheckbox').checked;
-    llamaLabEndpoint = document.getElementById('llamaEndpointInput').value;
+    // llamaLabEndpoint = document.getElementById('llamaEndpointInput').value;
 
     const routinePaste = document.getElementById('routineImportInput').value.trim();
     if (routinePaste !== "") {
