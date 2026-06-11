@@ -513,7 +513,7 @@ function setNewAnchor(audioMessage) {
     timerDisplay.style.color = "#ffffff"; 
     container.style.borderColor = "#333333";
     if (audioMessage) speak(audioMessage, true);
-    //document.body.style.filter = "brightness(0.1)";
+    document.body.style.filter = "brightness(0.1)";
 }
 
 // =========================================================================
@@ -671,7 +671,7 @@ async function checkRules() {
         const timeStamp = new Date().toLocaleTimeString('de-DE'); 
         logEvents.push(`[${timeStamp}] DRIFT: Bewegung erkannt bei [${brokenJoint}] -> SOFORT-STRAFE: +${penalty}s`);
         
-        // document.body.style.filter = "none";
+        document.body.style.filter = "none";
         
         let utteranceText = phrases.drift.replace("{joint}", brokenJoint).replace("{penalty}", penalty);
         speak(utteranceText, true, () => {
@@ -716,7 +716,7 @@ async function endWorkout(endReason) {
     isPrepared = false; 
     if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
 
-    // document.body.style.filter = "none";
+    document.body.style.filter = "none";
     
     const endTimestamp = Date.now(); 
     const endTimeStr = new Date(endTimestamp).toLocaleString('de-DE');
