@@ -513,7 +513,8 @@ function setNewAnchor(audioMessage) {
     timerDisplay.style.color = "#ffffff"; 
     container.style.borderColor = "#333333";
     if (audioMessage) speak(audioMessage, true);
-    document.body.style.filter = "brightness(0.1)";
+    
+    // document.body.style.filter = "brightness(0.1)";
 }
 
 // =========================================================================
@@ -526,6 +527,28 @@ async function loop() {
     if (!video.videoWidth || video.videoWidth === 0) {
         requestAnimationFrame(loop);
         return;
+    }
+
+    if (isPrepared) {
+        // Wir aktualisieren hier NUR noch die KI im Hintergrund
+        if (detector && video.readyState >= 2 && !isProcessingPose && Date.now() - lastAICheckTimestamp >= 1500) {
+            isProcessingPose = true;
+            lastAICheckTimestamp = Date.now();
+            detector.estimatePoses(video).then(async (poses) => { // Direkt vom 'video' statt vom 'canvas' lesen!
+                if (poses && poses.length > 0) { 
+                    poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; }); 
+                } 
+                await checkRules(); 
+                isProcessingPose = false;
+            }).catch(err => { isProcessingPose = false; });
+        }
+        
+        // Die bunten Punkte (DOM-Overlays) blenden wir im Workout aus, um Layout-Berechnungen zu sparen
+        Object.values(pts).forEach(p => p.style.display = 'none');
+        if (pts.head) pts.head.style.display = 'none';
+        
+        requestAnimationFrame(loop);
+        return; // Schleife vorzeitig abbrechen, kein drawImage()!
     }
     
     canvas.width = 257; 
