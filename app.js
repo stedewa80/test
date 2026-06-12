@@ -1,7 +1,8 @@
 // =========================================================================
 // CORNERTIME WÄCHTER - KERNSTEUERUNG (FINALE INTEGRATION)
 // =========================================================================
-
+const TIER_REPOSITION_DELAY = 66; // ~15 FPS (Smooth enough for setup / grace periods)
+const TIER_STILLNESS_DELAY = 200;
 // --- DOM Elemente & Canvas-Kontext ---
 const video = document.getElementById('webcam');
 const canvas = document.getElementById('processingCanvas');
@@ -530,6 +531,10 @@ async function loop() {
         requestAnimationFrame(loop);
         return;
     }
+
+    // Determine the user state and frame delay requirements
+    const isUserRepositioning = !isPrepared || isGracePeriodActive;
+    const frameDelay = isUserRepositioning ? TIER_REPOSITION_DELAY : TIER_STILLNESS_DELAY;
     
     // canvas.width = 257; 
     // canvas.height = 257;
@@ -595,7 +600,7 @@ async function loop() {
     //}
     
     //requestAnimationFrame(loop);
-    const frameDelay = 200;
+    //const frameDelay = 200;
     scheduleNextFrame(frameDelay);
 }
 
