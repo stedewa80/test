@@ -5,6 +5,8 @@
 // --- DOM Elemente & Canvas-Kontext ---
 const video = document.getElementById('webcam');
 const canvas = document.getElementById('processingCanvas');
+const canvas.width = 257; 
+const canvas.height = 257;
 const ctx = canvas.getContext('2d');
 const container = document.getElementById('camContainer');
 const status = document.getElementById('status');
@@ -528,20 +530,6 @@ async function loop() {
         requestAnimationFrame(loop);
         return;
     }
-
-    if (isPrepared) {
-        // Wir aktualisieren hier NUR noch die KI im Hintergrund
-        if (detector && video.readyState >= 2 && !isProcessingPose && Date.now() - lastAICheckTimestamp >= 1500) {
-            isProcessingPose = true;
-            lastAICheckTimestamp = Date.now();
-            detector.estimatePoses(video).then(async (poses) => { // Direkt vom 'video' statt vom 'canvas' lesen!
-                if (poses && poses.length > 0) { 
-                    poses[0].keypoints.forEach(k => { latestKeypoints[k.name] = { x: k.x, y: k.y, score: k.score }; }); 
-                } 
-                await checkRules(); 
-                isProcessingPose = false;
-            }).catch(err => { isProcessingPose = false; });
-        }
         
         // Die bunten Punkte (DOM-Overlays) blenden wir im Workout aus, um Layout-Berechnungen zu sparen
         Object.values(pts).forEach(p => p.style.display = 'none');
@@ -551,8 +539,8 @@ async function loop() {
         return; // Schleife vorzeitig abbrechen, kein drawImage()!
     }
     
-    canvas.width = 257; 
-    canvas.height = 257;
+    // canvas.width = 257; 
+    // canvas.height = 257;
     
     let sx = 0, sy = 0, sWidth = video.videoWidth, sHeight = video.videoHeight;
 
