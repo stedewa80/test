@@ -571,6 +571,33 @@ async function loop() {
     }
     
     let cW = container.clientWidth; let cH = container.clientHeight;
+    renderDOMPoints(cW, cH);
+    //updatePointDOM(pts.lS, 'left_shoulder', cW, cH); 
+    //updatePointDOM(pts.rS, 'right_shoulder', cW, cH); 
+    //updatePointDOM(pts.lW, 'left_wrist', cW, cH); 
+    //updatePointDOM(pts.rW, 'right_wrist', cW, cH); 
+    //updatePointDOM(pts.lE, 'left_elbow', cW, cH); 
+    //updatePointDOM(pts.rE, 'right_elbow', cW, cH); 
+    //updatePointDOM(pts.lH, 'left_hip', cW, cH); 
+    //updatePointDOM(pts.rH, 'right_hip', cW, cH); 
+    //updatePointDOM(pts.lK, 'left_knee', cW, cH); 
+    //updatePointDOM(pts.rK, 'right_knee', cW, cH);
+    
+    //if (f('left_heel')) updatePointDOM(pts.lF, 'left_heel', cW, cH); else updatePointDOM(pts.lF, 'left_foot_index', cW, cH);
+    //if (f('right_heel')) updatePointDOM(pts.rF, 'right_heel', cW, cH); else updatePointDOM(pts.rF, 'right_foot_index', cW, cH);
+
+    //if (f('left_ear') && f('right_ear')) { 
+    //    pts.head.style.left = `${(((latestKeypoints.left_ear.x + latestKeypoints.right_ear.x)/2) / 257) * cW}px`; 
+    //    pts.head.style.top = `${(((latestKeypoints.left_ear.y + latestKeypoints.right_ear.y)/2) / 257) * cH}px`; 
+    //    pts.head.style.display = 'block'; 
+    //} else { 
+    //    pts.head.style.display = 'none'; 
+    //}
+    
+    requestAnimationFrame(loop);
+}
+
+function renderDOMPoints(cW, cH) {
     updatePointDOM(pts.lS, 'left_shoulder', cW, cH); 
     updatePointDOM(pts.rS, 'right_shoulder', cW, cH); 
     updatePointDOM(pts.lW, 'left_wrist', cW, cH); 
@@ -585,15 +612,16 @@ async function loop() {
     if (f('left_heel')) updatePointDOM(pts.lF, 'left_heel', cW, cH); else updatePointDOM(pts.lF, 'left_foot_index', cW, cH);
     if (f('right_heel')) updatePointDOM(pts.rF, 'right_heel', cW, cH); else updatePointDOM(pts.rF, 'right_foot_index', cW, cH);
 
+    // Compute midpoint positioning for head tracking indicator
     if (f('left_ear') && f('right_ear')) { 
-        pts.head.style.left = `${(((latestKeypoints.left_ear.x + latestKeypoints.right_ear.x)/2) / 257) * cW}px`; 
-        pts.head.style.top = `${(((latestKeypoints.left_ear.y + latestKeypoints.right_ear.y)/2) / 257) * cH}px`; 
+        const midX = (latestKeypoints.left_ear.x + latestKeypoints.right_ear.x) / 2;
+        const midY = (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2;
+        pts.head.style.left = `${(midX / 257) * cW}px`; 
+        pts.head.style.top = `${(midY / 257) * cH}px`; 
         pts.head.style.display = 'block'; 
     } else { 
         pts.head.style.display = 'none'; 
     }
-    
-    requestAnimationFrame(loop);
 }
 
 // =========================================================================
