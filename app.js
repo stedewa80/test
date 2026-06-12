@@ -594,7 +594,9 @@ async function loop() {
     //    pts.head.style.display = 'none'; 
     //}
     
-    requestAnimationFrame(loop);
+    //requestAnimationFrame(loop);
+    const frameDelay = 200;
+    scheduleNextFrame(frameDelay);
 }
 
 function renderDOMPoints(cW, cH) {
@@ -622,6 +624,14 @@ function renderDOMPoints(cW, cH) {
     } else { 
         pts.head.style.display = 'none'; 
     }
+}
+
+function scheduleNextFrame(delay) {
+    if (appEnded) return;
+
+    setTimeout(() => {
+        requestAnimationFrame(loop);
+    }, delay);
 }
 
 // =========================================================================
