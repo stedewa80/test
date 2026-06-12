@@ -530,14 +530,6 @@ async function loop() {
         requestAnimationFrame(loop);
         return;
     }
-        
-        // Die bunten Punkte (DOM-Overlays) blenden wir im Workout aus, um Layout-Berechnungen zu sparen
-        Object.values(pts).forEach(p => p.style.display = 'none');
-        if (pts.head) pts.head.style.display = 'none';
-        
-        requestAnimationFrame(loop);
-        return; // Schleife vorzeitig abbrechen, kein drawImage()!
-    }
     
     // canvas.width = 257; 
     // canvas.height = 257;
