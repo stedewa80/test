@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CornerTime - Unbestechlicher Wächter Pro v3.0</title>
+    
+    <link rel="stylesheet" href="style.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.20.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.20.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3"></script>
+</head>
+<body>
+    <div class="app-container">
+        <div id="setupScreen" class="setup-screen">
+            <h2>Wächter Pro Setup</h2>
+            
+            <h3>Haltungs-Matrix</h3>
+            <label for="positionSelect">Unterkörper-Basis</label>
+            <select id="positionSelect" class="custom-select">
+                <option value="STEHEND">Stehend (Aufrecht, gestreckte Beine)</option>
+                <option value="KNIEND_AUFRECHT">Kniend - aufrecht (Hüfte gestreckt)</option>
+                <option value="KNIEND_SITZEND">Kniend - auf Fersen sitzend (Gesäß tief)</option>
+                <option value="KNIEND_VORGEBEUGT">Kniend - nach vorne gebeugt (Oberkörper tief)</option>
+            </select>
+            
+            <label for="armSelect">Arm-Positionierung</label>
+            <select id="armSelect" class="custom-select">
+                <option value="UEBER_KOPF">Gerade über dem Kopf (Vertikal gestreckt)</option>
+                <option value="AUF_KOPF">Auf dem Kopf (Hände auf Scheitel, Ellbogen außen)</option>
+                <option value="HINTER_KOPF">Hinter dem Kopf (Ineinander verschränkt)</option>
+                <option value="DREIZACK">Seitlich neben dem Kopf (Dreizack-Haltung)</option>
+                <option value="RUECKEN_ELLBOGEN">Hinter dem Rücken (Hände greifen Ellbogen)</option>
+                <option value="RUECKEN_PO">Hinter dem Rücken (Hände ruhen flach auf Po)</option>
+                <option value="IGNORIEREN">Nicht sichtbar / Ignorieren</option>
+            </select>
+            
+            <label for="legSelect">Bein-Spreizung</label>
+            <select id="legSelect" class="custom-select">
+                <option value="ZUSAMMEN">Beine zusammen (Geschlossene Knie/Füße)</option>
+                <option value="GESPREIZT">Beine gespreizt (Breiter Stand/Kniestand)</option>
+                <option value="IGNORIEREN">Nicht sichtbar / Ignorieren</option>
+            </select>
+            
+            <h3>Dauer (Zufallsbereich in Sek.)</h3>
+            <div class="row">
+                <div class="col"><label>Min (Sek)</label><input type="number" id="minDuration" class="custom-input" value="30"></div>
+                <div class="col"><label>Max (Sek)</label><input type="number" id="maxDuration" class="custom-input" value="45"></div>
+                <div class="col"><label>Max-Deckel (Sek)</label><input type="number" id="capDuration" class="custom-input" value="120"></div>
+            </div>
+
+            <h3>Strafe pro Vorfall (Zufall in Sek.)</h3>
+            <div class="row">
+                <div class="col"><label>Min Strafe</label><input type="number" id="minPenalty" class="custom-input" value="5"></div>
+                <div class="col"><label>Max Strafe</label><input type="number" id="maxPenalty" class="custom-input" value="10"></div>
+            </div>
+            
+            <h3>Erweiterte Optionen</h3>
+            <label class="custom-checkbox-container">
+                <input type="checkbox" id="hideTimerCheckbox">
+                <span>Blind-Modus (Timer verbergen)</span>
+            </label>
+
+            <h3>Display-Einstellungen</h3>
+            <div class="row">
+                <div class="col"><label>Standard FPS</label><input type="number" id="standardFPS" class="custom-input" value="15"></div>
+                <div class="col"><label>Reduced FPS</label><input type="number" id="reducedFPS" class="custom-input" value="4"></div>
+                <div class="col"><label>KI-Check (FPS)</label><input type="number" id="aicheckFPS" class="custom-input" value="2"></div>
+            </div>
+
+            <label class="custom-checkbox-container">
+                <input type="checkbox" id="dimDisplayCheckbox">
+                <span>Display dimmen</span>
+            </label>
+
+            <h3>Ansagen</h3>
+            <label for="customStartInput">Eigener Startsatz:</label>
+            <input type="text" id="customStartInput" class="custom-input" placeholder="Standard-Startansage nutzen...">
+
+            <label for="customEncouragementInput">Eigene Motivationssprüche (mit Semikolon trennen):</label>
+            <input type="text" id="customEncouragementInput" class="custom-input" placeholder="Z. B.: Weiter so!; Nicht aufgeben!; Du schaffst das!">
+
+            <label for="customEndInput">Eigener Endsatz:</label>
+            <input type="text" id="customEndInput" class="custom-input" placeholder="Z. B.: Du hast es geschafft!">
+
+            <h3>Buddy Fälschungsschutz</h3>
+            <label for="secretSalt">Gemeinsames Geheimwort (Salt)</label>
+            <input type="text" id="secretSalt" class="custom-input" value="schweinehundbezwingen2026">
+            
+            <h3>WhatsApp Routine-Tausch</h3>
+            <label for="routineImportInput">Geheime Routine importieren</label>
+            <textarea id="routineImportInput" class="log-output" style="height: 80px; margin-bottom: 10px;" placeholder="Füge hier den Code deines Buddies ein..."></textarea>
+
+            <button class="start-btn" onclick="startApp()">WÄCHTER AKTIVIEREN</button>
+            <button class="whatsapp-btn" onclick="generateRoutineString()">Routine per WhatsApp teilen</button>
+            <button class="secondary-btn" onclick="showVerificationOption()">Logfile verifizieren (Buddy-Modus)</button>
+        </div>
+        
+        <div id="activeScreen">
+            <div id="timerDisplay" class="timer-display">00:00</div>
+            <div id="status" class="status-message">Kamera initialisieren...</div>
+            <div class="camera-box" id="camContainer">
+                <video id="webcam" autoplay playsinline muted style="display:none !important;"></video>
+                <canvas id="processingCanvas"></canvas>
+                
+                <div id="ptHead" class="joint-indicator"></div>
+                <div id="ptLShoulder" class="joint-indicator"></div>
+                <div id="ptRShoulder" class="joint-indicator"></div>
+                <div id="ptLWrist" class="joint-indicator"></div>
+                <div id="ptRWrist" class="joint-indicator"></div>
+                <div id="ptLElbow" class="joint-indicator"></div>
+                <div id="ptRElbow" class="joint-indicator"></div>
+                <div id="ptLHip" class="joint-indicator"></div>
+                <div id="ptRHip" class="joint-indicator"></div>
+                <div id="ptLKnee" class="joint-indicator"></div>
+                <div id="ptRKnee" class="joint-indicator"></div>
+                <div id="ptLFoot" class="joint-indicator"></div>
+                <div id="ptRFoot" class="joint-indicator"></div>
+            </div>
+        </div>
+
+        <div id="logScreen" class="log-screen">
+            <h2 id="logTitle">Workout Protokoll</h2>
+            <div id="verifyBadge" class="verification-badge" style="display:none;"></div>
+            <p style="font-size:0.85rem; color:#aaa; margin-bottom:10px;">Kopiere den gesamten unteren Block für deinen Buddy:</p>
+            <textarea id="logOutput" class="log-output" readonly></textarea>
+            <div id="buddyVerifyBox" style="display:none; margin-top:15px;">
+                <button class="start-btn" style="margin-top:0;" onclick="verifyPastedLog()">LOG JETZT PRÜFEN</button>
+            </div>
+            <button class="secondary-btn" onclick="location.reload()">Zurück zum Hauptmenü</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
