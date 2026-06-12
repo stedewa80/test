@@ -5,8 +5,8 @@
 // --- DOM Elemente & Canvas-Kontext ---
 const video = document.getElementById('webcam');
 const canvas = document.getElementById('processingCanvas');
-const canvas.width = 257; 
-const canvas.height = 257;
+// const canvas.width = 257; 
+// const canvas.height = 257;
 const ctx = canvas.getContext('2d');
 const container = document.getElementById('camContainer');
 const status = document.getElementById('status');
@@ -531,8 +531,8 @@ async function loop() {
         return;
     }
     
-    // canvas.width = 257; 
-    // canvas.height = 257;
+    canvas.width = 257; 
+    canvas.height = 257;
     
     let sx = 0, sy = 0, sWidth = video.videoWidth, sHeight = video.videoHeight;
 
