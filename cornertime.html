@@ -63,6 +63,18 @@
                 <span>Blind-Modus (Timer verbergen)</span>
             </label>
 
+            <h3>Display-Einstellungen</h3>
+            <div class="row">
+                <div class="col"><label>Standard FPS</label><input type="number" id="standardFPS" class="custom-input" value="15"></div>
+                <div class="col"><label>Reduced FPS</label><input type="number" id="reducedFPS" class="custom-input" value="4"></div>
+                <div class="col"><label>KI-Check (FPS)</label><input type="number" id="aicheckFPS" class="custom-input" value="2"></div>
+            </div>
+
+            <label class="custom-checkbox-container">
+                <input type="checkbox" id="dimDisplayCheckbox">
+                <span>Display dimmen</span>
+            </label>
+
             <!-- LlamaLab Integration
             <label for="llamaEndpointInput" style="margin-top: 12px; display: block;">LlamaLab Automate Endpunkt (Optional)</label>
             <input type="text" id="llamaEndpointInput" class="custom-input" placeholder="http://192.168.x.x:8080/endpoint">
