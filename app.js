@@ -821,6 +821,18 @@ async function loadImportedRoutine(payload) {
 // 9. METRICS CRYPTOGRAPHIC VERIFICATION & DATA SIGNING
 // =========================================================================
 
+/**
+ * Generates a SHA-256 HMAC signature for a given string using a shared secret key.
+ */
+async function generateHMAC(text, secret) {
+    const encoder = new TextEncoder(); 
+    const keyData = encoder.encode(secret); 
+    const msgData = encoder.encode(text);
+    const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const signature = await crypto.subtle.sign('HMAC', cryptoKey, msgData);
+    return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 async function endWorkout(endReason) {
     appEnded = true; 
     clearInterval(workoutInterval); 
