@@ -87,6 +87,7 @@ label {
     font-weight: bold; 
     outline: none; 
     box-sizing: border-box; 
+    margin-bottom: 12px;
     font-variant-numeric: tabular-nums; 
 }
 .custom-input:focus { 
