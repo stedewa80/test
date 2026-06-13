@@ -1,13 +1,37 @@
 // =========================================================================
-// 1. GLOBAL CONFIGURATION & APP CONSTANTS
+// 1. Define all Cornertime Settings and Variables
 // =========================================================================
-// Diese Werte werden beim Start dynamisch aus der HTML überschrieben
-let tierRepositionDelay = 66; // Standard: ~15 FPS (1000 / 15)
-let tierStillnessDelay = 250; // Standard: ~4 FPS (1000 / 4)
-let aiCheckInterval = 500;    // Standard: ~2 FPS (1000 / 2)
 
-// Flag für das optionale Dimmen aus der HTML
+// --- Routine Selection ---
+let selPos = "", selArm = "", selLeg = "";
+
+// --- Duration and Penalties ---
+let minD = 30, maxD = 45, capD = 120;
+let minP = 5, maxP = 10;
+
+// --- Advanced Settings ---
+let isTimerHidden = false;
+
+// --- Custom Phrases ---
+let customStart = "";
+let customEncouragements = "";
+let customEnd = "";
+let minE = 20, maxE = 40;
+
+// --- Display Settings ---
+let standardFPS = 15, reducedFPS = 4, aiCheckFPS = 2;
 let allowDimming = false;
+//let isDisplayDim = false;
+
+// --- Crypto Settings ---
+let salt = "";
+
+// Routine input
+let inputRoutine = "";
+
+// =========================================================================
+// 2. Define all Video Settings and Variables
+// =========================================================================
 
 // --- DOM Layout Reference Elements ---
 const video = document.getElementById('webcam');
@@ -17,11 +41,14 @@ const container = document.getElementById('camContainer');
 const status = document.getElementById('status');
 const timerDisplay = document.getElementById('timerDisplay');
 
-// Set permanent input sizing properties for the rendering context
+// --- Canvas Sizing ---
 canvas.width = 257; 
 canvas.height = 257;
 
-// --- Physical UI Tracking Indicators (DOM Overlays) ---
+// --- Zoom Coordinates (Cropped Snapshot Bounds) ---
+let staticZoomCoords = null
+
+// --- DOM Overlay Elements (Physical Keypoint Tracking Indicators) ---
 const pts = { 
     head: document.getElementById('ptHead'), 
     lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), 
@@ -32,62 +59,44 @@ const pts = {
     lF: document.getElementById('ptLFoot'),     rF: document.getElementById('ptRFoot')
 };
 
-// =========================================================================
-// 2. RUNTIME STATE FLAGS & GLOBAL MEMORY ALLOCATION
-// =========================================================================
-// --- Active Routine Selection ---
-let selPos = "", selArm = "", selLeg = "";
+// --- Frame Delay ---
+let tierRepositionDelay = 66; // Standard: ~15 FPS (1000 / 15)
+let tierStillnessDelay = 250; // Standard: ~4 FPS (1000 / 4)
+let aiCheckInterval = 500;    // Standard: ~2 FPS (1000 / 2)
+let currentFrameDelay = tierRepositionDelay;
 
-// --- Target Boundaries and Crypto Settings ---
-let minD = 30, maxD = 45, capD = 120, minP = 5, maxP = 10, salt = "";
-
-// --- Core Tracking Engines ---
-let detector = null;
-let anchorPose = {};
-let isPrepared = false;
-let baseShoulderWidth = 100;
+// --- Wake Lock ---
 let wakeLock = null;
 
-// --- Workout Timeline Trackers ---
-let timeRemainingSeconds = 30;
-let totalTimeElapsed = 0;
-let workoutInterval = null;
+// =========================================================================
+// 3. Define all Audio Settings and Variables including Speech Output
+// =========================================================================
 
-// --- Status Management States ---
-let isGracePeriodActive = false;
-let gracePeriodEndTime = 0;
-let remainingSecondsCounter = 3;
-let appEnded = false;
-let isAudioSpeakingBlock = false;
-let activeUtterance = null; 
+// --- Default Speech Output ---
+let phrases = {
+    start: "In Position gehen",
+    drift: "Bewegung erkannt bei {joint}. Plus {penalty} Sekunden. Haltung korrigieren.",
+    escalation: "{msg}. Strafe plus {penalty} Sekunden.",
+    checkpoint: "Position erfolgreich wiederhergestellt.",
+    success: "Training beendet. Ausgezeichnet.",
+    capReached: "Maximalzeit erreicht. Abbruch."
+};
+let encouragementPhrases = ["Halt durch!", "Sehr gute Haltung!", "Bleib genau so.", "Rücken gerade lassen, perfekt!"];
 
-// --- Crop Snapshot Bounds ---
-let staticZoomCoords = null; 
-
-// --- Motivation Settings & Telemetry ---
-let isTimerHidden = false;
-let llamaLabEndpoint = ""; 
+// --- Encouragement Settings ---
 let nextEncouragementTimestamp = 0;
 let minEncouragementInterval = 20;
 let maxEncouragementInterval = 40;
 
-// --- Chrono Log Timestamps ---
-let initialTargetDuration = 0;
-let realStartTimestamp = 0;
-let startTimeStr = "";
-let lastCheckpointTimestamp = 0;
-let lastAICheckTimestamp = 0;
-let isProcessingPose = false; 
+// --- Audio State ---
+let isAudioSpeakingBlock = false;
+let activeUtterance = null; 
 
-// --- Analytics and Penalties Tracking ---
-let logEvents = [];
-let totalPenaltiesCount = 0;
-let totalPenaltySecondsSum = 0;
+// =========================================================================
+// 4. Define all Physical Keypoints and Variables including Translation
+// =========================================================================
 
-// --- Hardware Execution Rate Setting ---
-let currentFrameDelay = tierRepositionDelay; 
-
-// --- Pre-Allocated Keypoint Matrix Object Pool ---
+// --- Physical Keypoints (Pre-allocated Matrix Object Pool) ---
 const latestKeypoints = {
     left_shoulder: { x: 0, y: 0, score: 0 }, right_shoulder: { x: 0, y: 0, score: 0 },
     left_wrist:    { x: 0, y: 0, score: 0 }, right_wrist:    { x: 0, y: 0, score: 0 },
@@ -99,17 +108,7 @@ const latestKeypoints = {
     left_foot_index:  { x: 0, y: 0, score: 0 }, right_foot_index: { x: 0, y: 0, score: 0 }
 };
 
-// --- Language Strings & Translation Mappings ---
-let phrases = {
-    start: "In Position gehen",
-    drift: "Bewegung erkannt bei {joint}. Plus {penalty} Sekunden. Haltung korrigieren.",
-    escalation: "{msg}. Strafe plus {penalty} Sekunden.",
-    checkpoint: "Position erfolgreich wiederhergestellt.",
-    success: "Training beendet. Ausgezeichnet.",
-    capReached: "Maximalzeit erreicht. Abbruch."
-};
-let encouragementPhrases = ["Halt durch!", "Sehr gute Haltung!", "Bleib genau so.", "Rücken gerade lassen, perfekt!"];
-
+// --- Translation of Physical Keypoints ---
 const punktNamenDe = {
     'left_shoulder': 'Rechte Schulter', 'right_shoulder': 'Linke Schulter', 
     'left_elbow': 'Rechter Ellbogen',   'right_elbow': 'Linker Ellbogen',
@@ -120,6 +119,170 @@ const punktNamenDe = {
     'left_foot_index': 'Rechte Fußspitze', 'right_foot_index': 'Linke Fußspitze', 
     'left_ear': 'Kopf',                 'right_ear': 'Kopf'
 };
+
+// --- Anchor Pose ---
+let anchorPose = {};
+
+// --- Base Shoulder Width ---
+let baseShoulderWidth = 100;
+
+// =========================================================================
+// 3. Define all Management States, Time Trackers and Logging Variables
+// =========================================================================
+
+// --- Core Tracking Engine ---
+let detector = null;
+
+// --- Status Management States ---
+let isPrepared = false;
+let isProcessingPose = false;
+let isGracePeriodActive = false;
+let appEnded = false;
+
+// --- Workout Time Trackers ---
+let timeRemainingSeconds = 30;
+let totalTimeElapsed = 0;
+let workoutInterval = null;
+let gracePeriodEndTime = 0;
+let remainingSecondsCounter = 3;
+
+// --- Chrono Log Timestamps ---
+let initialTargetDuration = 0;
+let realStartTimestamp = 0;
+let startTimeStr = "";
+let lastCheckpointTimestamp = 0;
+let lastAICheckTimestamp = 0; 
+
+// --- Analytics and Penalties Tracking ---
+let logEvents = [];
+let totalPenaltiesCount = 0;
+let totalPenaltySecondsSum = 0;
+
+// --- Llamalab Endpoint ---
+let llamaLabEndpoint = "";
+
+// =========================================================================
+// 1. GLOBAL CONFIGURATION & APP CONSTANTS
+// =========================================================================
+// Diese Werte werden beim Start dynamisch aus der HTML überschrieben
+//let tierRepositionDelay = 66; // Standard: ~15 FPS (1000 / 15)
+//let tierStillnessDelay = 250; // Standard: ~4 FPS (1000 / 4)
+//let aiCheckInterval = 500;    // Standard: ~2 FPS (1000 / 2)
+
+// Flag für das optionale Dimmen aus der HTML
+//let allowDimming = false;
+
+// --- DOM Layout Reference Elements ---
+//const video = document.getElementById('webcam');
+//const canvas = document.getElementById('processingCanvas');
+//const ctx = canvas.getContext('2d');
+//const container = document.getElementById('camContainer');
+//const status = document.getElementById('status');
+//const timerDisplay = document.getElementById('timerDisplay');
+
+// Set permanent input sizing properties for the rendering context
+//canvas.width = 257; 
+//canvas.height = 257;
+
+// --- Physical UI Tracking Indicators (DOM Overlays) ---
+//const pts = { 
+//    head: document.getElementById('ptHead'), 
+//    lS: document.getElementById('ptLShoulder'), rS: document.getElementById('ptRShoulder'), 
+//    lW: document.getElementById('ptLWrist'),    rW: document.getElementById('ptRWrist'), 
+//    lE: document.getElementById('ptLElbow'),    rE: document.getElementById('ptRElbow'), 
+//    lH: document.getElementById('ptLHip'),      rH: document.getElementById('ptRHip'),
+//    lK: document.getElementById('ptLKnee'),     rK: document.getElementById('ptRKnee'), 
+//    lF: document.getElementById('ptLFoot'),     rF: document.getElementById('ptRFoot')
+//};
+
+// =========================================================================
+// 2. RUNTIME STATE FLAGS & GLOBAL MEMORY ALLOCATION
+// =========================================================================
+// --- Active Routine Selection ---
+//let selPos = "", selArm = "", selLeg = "";
+
+// --- Target Boundaries and Crypto Settings ---
+//let minD = 30, maxD = 45, capD = 120, minP = 5, maxP = 10, salt = "";
+
+// --- Core Tracking Engines ---
+//let detector = null;
+//let anchorPose = {};
+//let isPrepared = false;
+//let baseShoulderWidth = 100;
+//let wakeLock = null;
+
+// --- Workout Timeline Trackers ---
+//let timeRemainingSeconds = 30;
+//let totalTimeElapsed = 0;
+//let workoutInterval = null;
+
+// --- Status Management States ---
+//let isGracePeriodActive = false;
+//let gracePeriodEndTime = 0;
+//let remainingSecondsCounter = 3;
+//let appEnded = false;
+//let isAudioSpeakingBlock = false;
+//let activeUtterance = null; 
+
+// --- Crop Snapshot Bounds ---
+//let staticZoomCoords = null; 
+
+// --- Motivation Settings & Telemetry ---
+//let isTimerHidden = false;
+//let llamaLabEndpoint = ""; 
+//let nextEncouragementTimestamp = 0;
+//let minEncouragementInterval = 20;
+//let maxEncouragementInterval = 40;
+
+// --- Chrono Log Timestamps ---
+//let initialTargetDuration = 0;
+//let realStartTimestamp = 0;
+//let startTimeStr = "";
+//let lastCheckpointTimestamp = 0;
+//let lastAICheckTimestamp = 0;
+//let isProcessingPose = false; 
+
+// --- Analytics and Penalties Tracking ---
+//let logEvents = [];
+//let totalPenaltiesCount = 0;
+//let totalPenaltySecondsSum = 0;
+
+// --- Hardware Execution Rate Setting ---
+//let currentFrameDelay = tierRepositionDelay; 
+
+// --- Pre-Allocated Keypoint Matrix Object Pool ---
+//const latestKeypoints = {
+//    left_shoulder: { x: 0, y: 0, score: 0 }, right_shoulder: { x: 0, y: 0, score: 0 },
+//    left_wrist:    { x: 0, y: 0, score: 0 }, right_wrist:    { x: 0, y: 0, score: 0 },
+//    left_elbow:    { x: 0, y: 0, score: 0 }, right_elbow:    { x: 0, y: 0, score: 0 },
+//    left_hip:      { x: 0, y: 0, score: 0 }, right_hip:      { x: 0, y: 0, score: 0 },
+//    left_knee:     { x: 0, y: 0, score: 0 }, right_knee:     { x: 0, y: 0, score: 0 },
+//    left_heel:     { x: 0, y: 0, score: 0 }, right_heel:     { x: 0, y: 0, score: 0 },
+//    left_ear:      { x: 0, y: 0, score: 0 }, right_ear:      { x: 0, y: 0, score: 0 },
+//    left_foot_index:  { x: 0, y: 0, score: 0 }, right_foot_index: { x: 0, y: 0, score: 0 }
+//};
+
+// --- Language Strings & Translation Mappings ---
+//let phrases = {
+//    start: "In Position gehen",
+//    drift: "Bewegung erkannt bei {joint}. Plus {penalty} Sekunden. Haltung korrigieren.",
+//    escalation: "{msg}. Strafe plus {penalty} Sekunden.",
+//    checkpoint: "Position erfolgreich wiederhergestellt.",
+//    success: "Training beendet. Ausgezeichnet.",
+//    capReached: "Maximalzeit erreicht. Abbruch."
+//};
+//let encouragementPhrases = ["Halt durch!", "Sehr gute Haltung!", "Bleib genau so.", "Rücken gerade lassen, perfekt!"];
+
+//const punktNamenDe = {
+//    'left_shoulder': 'Rechte Schulter', 'right_shoulder': 'Linke Schulter', 
+//    'left_elbow': 'Rechter Ellbogen',   'right_elbow': 'Linker Ellbogen',
+//    'left_wrist': 'Rechtes Handgelenk', 'right_wrist': 'Linkes Handgelenk', 
+//    'left_hip': 'Rechte Hüfte',         'right_hip': 'Linke Hüfte',
+//    'left_knee': 'Rechtes Knie',        'right_knee': 'Linkes Knie', 
+//    'left_heel': 'Rechte Ferse',        'right_heel': 'Linke Ferse',
+//    'left_foot_index': 'Rechte Fußspitze', 'right_foot_index': 'Linke Fußspitze', 
+//    'left_ear': 'Kopf',                 'right_ear': 'Kopf'
+//};
 
 // =========================================================================
 // 3. TEXT-TO-SPEECH (TTS) & METRIC UI UTILITIES
