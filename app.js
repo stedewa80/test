@@ -19,7 +19,7 @@ let customEnd = "";
 let minE = 20, maxE = 40;
 
 // --- Display Settings ---
-let standardFPS = 15, reducedFPS = 4, aiCheckFPS = 2;
+let standardFPS = 15, reducedFPS = 4, aicheckFPS = 2;
 let allowDimming = false;
 //let isDisplayDim = false;
 
@@ -366,31 +366,31 @@ function hasAnyFoot(side) {
 // =========================================================================
 
 async function startApp() {
-    salt = document.getElementById('secretSalt').value;
-    isTimerHidden = document.getElementById('hideTimerCheckbox').checked;
-    allowDimming = document.getElementById('dimDisplayCheckbox').checked;
+    //salt = document.getElementById('secretSalt').value;
+    //isTimerHidden = document.getElementById('hideTimerCheckbox').checked;
+    //allowDimming = document.getElementById('dimDisplayCheckbox').checked;
 
     // --- Display- & Performance-Einstellungen übernehmen ---
-    const standardFPS = parseInt(document.getElementById('standardFPS').value) || 15;
-    const reducedFPS = parseInt(document.getElementById('reducedFPS').value) || 4;
-    const aicheckFPS = parseInt(document.getElementById('aicheckFPS').value) || 2;
+    //const standardFPS = parseInt(document.getElementById('standardFPS').value) || 15;
+    //const reducedFPS = parseInt(document.getElementById('reducedFPS').value) || 4;
+    //const aicheckFPS = parseInt(document.getElementById('aicheckFPS').value) || 2;
 
-    tierRepositionDelay = Math.round(1000 / standardFPS);
-    tierStillnessDelay = Math.round(1000 / reducedFPS);
-    aiCheckInterval = Math.round(1000 / aicheckFPS);
-    currentFrameDelay = tierRepositionDelay;
+    //tierRepositionDelay = Math.round(1000 / standardFPS);
+    //tierStillnessDelay = Math.round(1000 / reducedFPS);
+    //aiCheckInterval = Math.round(1000 / aicheckFPS);
+    //currentFrameDelay = tierRepositionDelay;
 
     // --- Eigene Ansagen / Phrasen übernehmen ---
-    const customStart = document.getElementById('customStartInput').value.trim();
-    const customEncouragements = document.getElementById('customEncouragementInput').value.trim();
-    const customEnd = document.getElementById('customEndInput').value.trim();
+    //const customStart = document.getElementById('customStartInput').value.trim();
+    //const customEncouragements = document.getElementById('customEncouragementInput').value.trim();
+    //const customEnd = document.getElementById('customEndInput').value.trim();
 
-    if (customEncouragements !== "") {
-        encouragementPhrases = customEncouragements.split(';').map(s => s.trim()).filter(s => s !== "");
+    //if (customEncouragements !== "") {
+    //    encouragementPhrases = customEncouragements.split(';').map(s => s.trim()).filter(s => s !== "");
     }
-    if (customEnd !== "") {
-        phrases.success = customEnd;
-    }
+    //if (customEnd !== "") {
+    //    phrases.success = customEnd;
+    //}
 
     // --- Routine-Import oder manuelle Eingabe prüfen ---
     const routinePaste = document.getElementById('routineImportInput').value.trim();
@@ -404,6 +404,19 @@ async function startApp() {
         minD = parseInt(document.getElementById('minDuration').value); 
         maxD = parseInt(document.getElementById('maxDuration').value); 
         capD = parseInt(document.getElementById('capDuration').value);
+        minP = parseInt(document.getElementById('minPenalty').value); 
+        maxP = parseInt(document.getElementById('maxPenalty').value); 
+        isTimerHidden = document.getElementById('hideTimerCheckbox').checked;
+        customStart = document.getElementById('customStartInput').value.trim();
+        customEncouragements = document.getElementById('customEncouragementInput').value.trim();
+        customEnd = document.getElementById('customEndInput').value.trim();
+        minE = parseInt(document.getElementById('minEncouragement').value); 
+        maxE = parseInt(document.getElementById('maxEncouragement').value); 
+        standardFPS = parseInt(document.getElementById('standardFPS').value) || 15;
+        reducedFPS = parseInt(document.getElementById('reducedFPS').value) || 4;
+        aicheckFPS = parseInt(document.getElementById('aicheckFPS').value) || 2;
+        allowDimming = document.getElementById('dimDisplayCheckbox').checked;
+        salt = document.getElementById('secretSalt').value;
     }
     
     if (customStart !== "") {
@@ -414,9 +427,20 @@ async function startApp() {
         let ansageBeine = selLeg.toLowerCase();
         phrases.start = `In Position gehen für deine Routine. Ausgangsposition: ${ansagePosition}. Armhaltung: ${ansageArme}. Beinhaltung: Beine ${ansageBeine}.`;
     }
+    if (customEncouragements !== "") {
+        encouragementPhrases = customEncouragements.split(';').map(s => s.trim()).filter(s => s !== "");
+    }
+    if (customEnd !== "") {
+        phrases.success = customEnd;
+    }
 
-    minP = parseInt(document.getElementById('minPenalty').value); 
-    maxP = parseInt(document.getElementById('maxPenalty').value); 
+    tierRepositionDelay = Math.round(1000 / standardFPS);
+    tierStillnessDelay = Math.round(1000 / reducedFPS);
+    aiCheckInterval = Math.round(1000 / aicheckFPS);
+    currentFrameDelay = tierRepositionDelay;
+    
+    //minP = parseInt(document.getElementById('minPenalty').value); 
+    //maxP = parseInt(document.getElementById('maxPenalty').value); 
 
     document.getElementById('setupScreen').style.display = 'none'; 
     document.getElementById('activeScreen').style.display = 'block';
