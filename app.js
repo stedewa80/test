@@ -1050,7 +1050,7 @@ async function loadImportedRoutine(payload) {
         minD = routine.minD; maxD = routine.maxD; capD = routine.capD;
         minP = routine.minP || 5; maxP = routine.maxP || 10;
         isTimerHidden = routine.isTimerHidden || false;
-        customStart = routine.customStart; customEncouragements = routine.customEncouragements; customEnf = routine.customEnd;
+        customStart = routine.customStart; customEncouragements = routine.customEncouragements; customEnd = routine.customEnd;
         minE = routine.minE; maxE = routine.maxE;
         standardFPS = routine.standardFPS; reducedFPS = routine.reducedFPS; aicheckFPS = routine.aicheckFPS;
         isDisplayDim = routine.isDisplayDim;
