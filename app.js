@@ -418,15 +418,51 @@ async function startApp() {
         allowDimming = document.getElementById('dimDisplayCheckbox').checked;
         salt = document.getElementById('secretSalt').value;
     }
-    
+
+    let ansagePosition = selPos.replace("_", " ").toLowerCase();
+    let ansageArme = selArm.replace("_", " ").toLowerCase();
+    let ansageBeine = selLeg.replace("_", " ").toLowerCase();
+
     if (customStart !== "") {
-        phrases.start = customStart;
+        // 1. Run the replacements anyway (in case they used some but not all placeholders)
+        let processedStart = customStart
+            .replaceAll("{Position}", ansagePosition)
+            .replaceAll("{Arme}", ansageArme)
+            .replaceAll("{Beine}", ansageBeine);
+    
+        // 2. Check if ANY of the placeholders were completely missing from the ORIGINAL input
+        const missingPosition = !customStart.includes("{Position}");
+        const missingArme = !customStart.includes("{Arme}");
+        const missingBeine = !customStart.includes("{Beine}");
+    
+        // 3. If any are missing, build a tailored add-on sentence
+        if (missingPosition || missingArme || missingBeine) {
+            let addon = " Zur Erinnerung:";
+            
+            if (missingPosition) addon += ` Ausgangsposition: ${ansagePosition}.`;
+            if (missingArme)     addon += ` Armhaltung: ${ansageArme}.`;
+            if (missingBeine)    addon += ` Beinhaltung: Beine ${ansageBeine}.`;
+            
+            // Append the add-on to the processed text
+            processedStart += addon;
+        }
+    
+        phrases.start = processedStart;
     } else {
-        let ansagePosition = selPos.replace("_", " ").toLowerCase();
-        let ansageArme = selArm.replace("_", " ").toLowerCase();
-        let ansageBeine = selLeg.toLowerCase();
         phrases.start = `In Position gehen für deine Routine. Ausgangsposition: ${ansagePosition}. Armhaltung: ${ansageArme}. Beinhaltung: Beine ${ansageBeine}.`;
     }
+    
+    //if (customStart !== "") {
+    //    customStart = processedStart.replaceAll("{Position}", ansagePosition);
+    //    customStart = processedStart.replaceAll("{Arme}", ansageArme);
+    //    customStart = processedStart.replaceAll("{Beine}", ansageBeine);
+    //    phrases.start = customStart;
+    //} else {
+    //    //let ansagePosition = selPos.replace("_", " ").toLowerCase();
+    //    //let ansageArme = selArm.replace("_", " ").toLowerCase();
+    //    //let ansageBeine = selLeg.toLowerCase();
+    //    phrases.start = `In Position gehen für deine Routine. Ausgangsposition: ${ansagePosition}. Armhaltung: ${ansageArme}. Beinhaltung: Beine ${ansageBeine}.`;
+    //}
     if (customEncouragements !== "") {
         encouragementPhrases = customEncouragements.split(';').map(s => s.trim()).filter(s => s !== "");
     }
