@@ -387,7 +387,7 @@ async function startApp() {
 
     //if (customEncouragements !== "") {
     //    encouragementPhrases = customEncouragements.split(';').map(s => s.trim()).filter(s => s !== "");
-    }
+    //}
     //if (customEnd !== "") {
     //    phrases.success = customEnd;
     //}
