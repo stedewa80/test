@@ -957,19 +957,39 @@ async function generateRoutineString() {
         if (!secret) { alert("Bitte gib zuerst ein Passwort (Salt) ein!"); return; }
 
         const routineData = {
-            pos: document.getElementById('positionSelect').value,
-            arm: document.getElementById('armSelect').value,
-            leg: document.getElementById('legSelect').value,
-            min: parseInt(document.getElementById('minDuration').value) || 30,
-            max: parseInt(document.getElementById('maxDuration').value) || 45,
-            cap: parseInt(document.getElementById('capDuration').value) || 120,
-            minP: parseInt(document.getElementById('minPenalty').value) || 5,
-            maxP: parseInt(document.getElementById('maxPenalty').value) || 10,
-            blind: document.getElementById('hideTimerCheckbox').checked,
-            cStart: document.getElementById('customStartInput').value.trim(),
-            cMotiv: document.getElementById('customEncouragementInput').value.trim(),
-            cEnd: document.getElementById('customEndInput').value.trim()
+            selPos: document.getElementById('positionSelect').value, 
+            selArm: document.getElementById('armSelect').value, 
+            selLeg: document.getElementById('legSelect').value,
+            minD: parseInt(document.getElementById('minDuration').value), 
+            maxD: parseInt(document.getElementById('maxDuration').value), 
+            capD: parseInt(document.getElementById('capDuration').value),
+            minP: parseInt(document.getElementById('minPenalty').value), 
+            maxP: parseInt(document.getElementById('maxPenalty').value), 
+            isTimerHidden: document.getElementById('hideTimerCheckbox').checked,
+            customStart: document.getElementById('customStartInput').value.trim(),
+            customEncouragements: document.getElementById('customEncouragementInput').value.trim(),
+            customEnd: document.getElementById('customEndInput').value.trim(),
+            minE: parseInt(document.getElementById('minEncouragement').value), 
+            maxE: parseInt(document.getElementById('maxEncouragement').value), 
+            standardFPS: parseInt(document.getElementById('standardFPS').value) || 15,
+            reducedFPS: parseInt(document.getElementById('reducedFPS').value) || 4,
+            aicheckFPS: parseInt(document.getElementById('aicheckFPS').value) || 2,
+            isDisplayDim: document.getElementById('dimDisplayCheckbox').checked,
+            salt: document.getElementById('secretSalt').value
         };
+            //pos: document.getElementById('positionSelect').value,
+            //arm: document.getElementById('armSelect').value,
+            //leg: document.getElementById('legSelect').value,
+            //min: parseInt(document.getElementById('minDuration').value) || 30,
+            //max: parseInt(document.getElementById('maxDuration').value) || 45,
+            //cap: parseInt(document.getElementById('capDuration').value) || 120,
+            //minP: parseInt(document.getElementById('minPenalty').value) || 5,
+            //maxP: parseInt(document.getElementById('maxPenalty').value) || 10,
+            //blind: document.getElementById('hideTimerCheckbox').checked,
+            //cStart: document.getElementById('customStartInput').value.trim(),
+            //cMotiv: document.getElementById('customEncouragementInput').value.trim(),
+            //cEnd: document.getElementById('customEndInput').value.trim()
+        //};
 
         const rawJson = JSON.stringify(routineData);
         const signature = await generateHMAC(rawJson, secret);
