@@ -1026,24 +1026,49 @@ async function loadImportedRoutine(payload) {
         
         const routine = JSON.parse(decodedJson);
         
-        selPos = routine.pos; selArm = routine.arm; selLeg = routine.leg;
-        minD = routine.min; maxD = routine.max; capD = routine.cap;
+        selPos = routine.selPos; selArm = routine.selArm; selLeg = routine.selLeg;
+        minD = routine.minD; maxD = routine.maxD; capD = routine.capD;
         minP = routine.minP || 5; maxP = routine.maxP || 10;
-        isTimerHidden = routine.blind || false;
+        isTimerHidden = routine.isTimerHidden || false;
+        customStart = routine.customStart; customEncouragements = routine.customEncouragements; customEnf = routine.customEnd;
+        minE = routine.minE; maxE = routine.maxE;
+        standardFPS = routine.standardFPS; reducedFPS = routine.reducedFPS; aicheckFPS = routine.aicheckFPS;
+        isDisplayDim = routine.isDisplayDim;
+        salt = routine.salt;
 
-        document.getElementById('positionSelect').value = selPos;
-        document.getElementById('armSelect').value = selArm;
+        document.getElementById('positionSelect').value = selPos; 
+        document.getElementById('armSelect').value = selArm; 
         document.getElementById('legSelect').value = selLeg;
-        document.getElementById('minDuration').value = minD;
-        document.getElementById('maxDuration').value = maxD;
+        document.getElementById('minDuration').value = minD; 
+        document.getElementById('maxDuration').value = maxD; 
         document.getElementById('capDuration').value = capD;
-        document.getElementById('minPenalty').value = minP;
-        document.getElementById('maxPenalty').value = maxP;
+        document.getElementById('minPenalty').value = minP; 
+        document.getElementById('maxPenalty').value = maxP; 
         document.getElementById('hideTimerCheckbox').checked = isTimerHidden;
+        document.getElementById('customStartInput').value = customStart;
+        document.getElementById('customEncouragementInput').value = customEncouragements;
+        document.getElementById('customEndInput').value = customEnd;
+        document.getElementById('minEncouragement').value = minE; 
+        document.getElementById('maxEncouragement').value = maxE; 
+        document.getElementById('standardFPS').value = standardFPS;
+        document.getElementById('reducedFPS').value = reducedFPS;
+        document.getElementById('aicheckFPS').value = aicheckFPS;
+        document.getElementById('dimDisplayCheckbox').checked = isDisplayDim;
+        document.getElementById('secretSalt').value = salt;
+
+        //document.getElementById('positionSelect').value = selPos;
+        //document.getElementById('armSelect').value = selArm;
+        //document.getElementById('legSelect').value = selLeg;
+        //document.getElementById('minDuration').value = minD;
+        //document.getElementById('maxDuration').value = maxD;
+        //document.getElementById('capDuration').value = capD;
+        //document.getElementById('minPenalty').value = minP;
+        //document.getElementById('maxPenalty').value = maxP;
+        //document.getElementById('hideTimerCheckbox').checked = isTimerHidden;
         
-        document.getElementById('customStartInput').value = routine.cStart || "";
-        document.getElementById('customEncouragementInput').value = routine.cMotiv || "";
-        document.getElementById('customEndInput').value = routine.cEnd || "";
+        //document.getElementById('customStartInput').value = routine.cStart || "";
+        //document.getElementById('customEncouragementInput').value = routine.cMotiv || "";
+        //document.getElementById('customEndInput').value = routine.cEnd || "";
 
         if (routine.cStart && routine.cStart.trim() !== "") phrases.start = routine.cStart;
         if (routine.cEnd && routine.cEnd.trim() !== "") phrases.success = routine.cEnd;
