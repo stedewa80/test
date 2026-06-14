@@ -20,8 +20,7 @@ let minE = 20, maxE = 40;
 
 // --- Display Settings ---
 let standardFPS = 15, reducedFPS = 4, aicheckFPS = 2;
-let allowDimming = false;
-//let isDisplayDim = false;
+let isDisplayDim = false;
 
 // --- Crypto Settings ---
 let salt = "";
@@ -60,10 +59,10 @@ const pts = {
 };
 
 // --- Frame Delay ---
-let tierRepositionDelay = 66; // Standard: ~15 FPS (1000 / 15)
-let tierStillnessDelay = 250; // Standard: ~4 FPS (1000 / 4)
+let standardDelay = 66; // Standard: ~15 FPS (1000 / 15)
+let increasedDelay = 250; // Standard: ~4 FPS (1000 / 4)
 let aiCheckInterval = 500;    // Standard: ~2 FPS (1000 / 2)
-let currentFrameDelay = tierRepositionDelay;
+let currentFrameDelay = standardDelay;
 
 // --- Wake Lock ---
 let wakeLock = null;
@@ -415,7 +414,7 @@ async function startApp() {
         standardFPS = parseInt(document.getElementById('standardFPS').value) || 15;
         reducedFPS = parseInt(document.getElementById('reducedFPS').value) || 4;
         aicheckFPS = parseInt(document.getElementById('aicheckFPS').value) || 2;
-        allowDimming = document.getElementById('dimDisplayCheckbox').checked;
+        isDisplayDim = document.getElementById('dimDisplayCheckbox').checked;
         salt = document.getElementById('secretSalt').value;
     }
 
@@ -470,10 +469,10 @@ async function startApp() {
         phrases.success = customEnd;
     }
 
-    tierRepositionDelay = Math.round(1000 / standardFPS);
-    tierStillnessDelay = Math.round(1000 / reducedFPS);
+    standardDelay = Math.round(1000 / standardFPS);
+    increasedDelay = Math.round(1000 / reducedFPS);
     aiCheckInterval = Math.round(1000 / aicheckFPS);
-    currentFrameDelay = tierRepositionDelay;
+    currentFrameDelay = standardDelay;
     
     //minP = parseInt(document.getElementById('minPenalty').value); 
     //maxP = parseInt(document.getElementById('maxPenalty').value); 
@@ -713,12 +712,12 @@ function updatePointDOM(element, partName, containerWidth, containerHeight) {
 
 function updateLoopPerformance(state) {
     if (state === 'SETUP' || state === 'GRACE_PERIOD') {
-        currentFrameDelay = tierRepositionDelay;
+        currentFrameDelay = standardDelay;
         document.body.style.filter = "none";
     } 
     else if (state === 'STILLNESS') {
-        currentFrameDelay = tierStillnessDelay;
-        if (allowDimming) {
+        currentFrameDelay = increasedDelay;
+        if (isDisplayDim) {
             document.body.style.filter = "brightness(0.3)";
         } else {
             document.body.style.filter = "none";
