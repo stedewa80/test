@@ -992,8 +992,13 @@ async function generateRoutineString() {
         //};
 
         const rawJson = JSON.stringify(routineData);
+
+        const jsonBytes = new TextEncoder().encode(rawJson);
+        const binaryString = String.fromCharCode(...jsonBytes);
+        const base64Payload = btoa(binaryString);
+
         const signature = await generateHMAC(rawJson, secret);
-        const sharePayload = btoa(encodeURIComponent(rawJson)) + "::" + signature;
+        const sharePayload = base64Payload + "::" + signature;
         
         const textMessage = `Hier ist deine geheime Cornertime-Routine:\n\n${sharePayload}`;
         const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(textMessage)}`;
@@ -1013,18 +1018,33 @@ async function loadImportedRoutine(payload) {
         
         const secret = document.getElementById('secretSalt').value.trim();
         if (!secret) { alert("Bitte gib das passende Passwort ein, um die Routine zu entschlüsseln!"); return false; }
-        
+
         const binaryString = atob(parts[0]);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
             bytes[i] = binaryString.charCodeAt(i);
         }
         const decodedJson = new TextDecoder().decode(bytes);
-        const computedSig = await generateHMAC(decodedJson, secret);
         
-        if (computedSig !== parts[1]) { alert("Ungültige Signatur! Falsches Passwort oder manipulierte Routine."); return false; }
+        const computedSig = await generateHMAC(decodedJson, secret);
+        if (computedSig !== parts[1]) { 
+            alert("Ungültige Signatur! Falsches Passwort oder manipulierte Routine."); 
+            return false; 
+        }
         
         const routine = JSON.parse(decodedJson);
+        
+        //const binaryString = atob(parts[0]);
+        //const bytes = new Uint8Array(binaryString.length);
+        //for (let i = 0; i < binaryString.length; i++) {
+        //    bytes[i] = binaryString.charCodeAt(i);
+        //}
+        //const decodedJson = new TextDecoder().decode(bytes);
+        //const computedSig = await generateHMAC(decodedJson, secret);
+        
+        //if (computedSig !== parts[1]) { alert("Ungültige Signatur! Falsches Passwort oder manipulierte Routine."); return false; }
+        
+        //const routine = JSON.parse(decodedJson);
         
         selPos = routine.selPos; selArm = routine.selArm; selLeg = routine.selLeg;
         minD = routine.minD; maxD = routine.maxD; capD = routine.capD;
