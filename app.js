@@ -325,12 +325,14 @@ function speak(text, force = false, callbackOnEnd = null) {
     }
 }
 
+// Format time from sec to min:sec
 function formatTime(totalSeconds) {
-    const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0'); 
-    const secs = (totalSeconds % 60).toString().padStart(2, '0'); 
-    return `${mins}:${secs}`;
+    const min = Math.floor(totalSeconds / 60).toString().padStart(2, '0'); 
+    const sec = (totalSeconds % 60).toString().padStart(2, '0'); 
+    return `${min}:${sec}`;
 }
 
+// Display updated timer (hidden if isTimerHidden selected)
 function updateTimerUI() { 
     timerDisplay.innerText = isTimerHidden ? "••:••" : formatTime(timeRemainingSeconds); 
 }
@@ -339,8 +341,10 @@ function updateTimerUI() {
 // 4. COORDINATE EVALUATION HELPERS
 // =========================================================================
 
+// Get latest keypoints and store in pre-allocated matrix
 function f(part) { return latestKeypoints[part] && latestKeypoints[part].score > 0.4; }
 
+// Calculate keypoints for the head from available keypoints for ears, eyes or nose
 function getHeadY() {
     if (f('left_ear') && f('right_ear')) return (latestKeypoints.left_ear.y + latestKeypoints.right_ear.y) / 2;
     if (f('left_eye') && f('right_eye')) return (latestKeypoints.left_eye.y + latestKeypoints.right_eye.y) / 2;
