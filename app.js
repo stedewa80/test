@@ -369,11 +369,7 @@ function hasAnyFoot(side) {
 // =========================================================================
 
 async function startApp() {
-    // Dynamically build the exact string Automate expects
-    const url = `auto:["not", "hello"]`;
     
-    // Redirect to the custom scheme
-    window.location.href = url;
     //salt = document.getElementById('secretSalt').value;
     //isTimerHidden = document.getElementById('hideTimerCheckbox').checked;
     //allowDimming = document.getElementById('dimDisplayCheckbox').checked;
@@ -400,7 +396,7 @@ async function startApp() {
     //    phrases.success = customEnd;
     //}
 
-    // --- Routine-Import oder manuelle Eingabe prüfen ---
+    // --- Read parameters from imported routine or from website ---
     const routinePaste = document.getElementById('routineImportInput').value.trim();
     if (routinePaste !== "") {
         const success = await loadImportedRoutine(routinePaste);
@@ -427,23 +423,26 @@ async function startApp() {
         salt = document.getElementById('secretSalt').value;
     }
 
-    let ansagePosition = selPos.replace("_", " ").toLowerCase();
-    let ansageArme = selArm.replace("_", " ").toLowerCase();
-    let ansageBeine = selLeg.replace("_", " ").toLowerCase();
+    // --- Define posture announcements ---
+    let announcePos = selPos.replace("_", " ").toLowerCase();
+    let announceArm = selArm.replace("_", " ").toLowerCase();
+    let announceLeg = selLeg.replace("_", " ").toLowerCase();
 
+    // --- Define custom start phrase ---
     if (customStart !== "") {
-        // 1. Run the replacements anyway (in case they used some but not all placeholders)
+        
+        // Replace existing placeholders with posture announcements
         let processedStart = customStart
-            .replaceAll("{Position}", ansagePosition)
-            .replaceAll("{Arme}", ansageArme)
-            .replaceAll("{Beine}", ansageBeine);
+            .replaceAll("{Position}", announcePos)
+            .replaceAll("{Arme}", announceArm)
+            .replaceAll("{Beine}", announceLeg);
     
-        // 2. Check if ANY of the placeholders were completely missing from the ORIGINAL input
+        // Check for missing placeholders in the original input
         const missingPosition = !customStart.includes("{Position}");
         const missingArme = !customStart.includes("{Arme}");
         const missingBeine = !customStart.includes("{Beine}");
     
-        // 3. If any are missing, build a tailored add-on sentence
+        // Add posture reminder in case of missing placeholders
         if (missingPosition || missingArme || missingBeine) {
             let addon = " Zur Erinnerung:";
             
@@ -451,12 +450,15 @@ async function startApp() {
             if (missingArme)     addon += ` Armhaltung: ${ansageArme}.`;
             if (missingBeine)    addon += ` Beinhaltung: Beine ${ansageBeine}.`;
             
-            // Append the add-on to the processed text
+            // Append reminder to processed input
             processedStart += addon;
         }
     
+        // Define custom start phrase 
         phrases.start = processedStart;
     } else {
+
+        // Define default start phrase
         phrases.start = `In Position gehen für deine Routine. Ausgangsposition: ${ansagePosition}. Armhaltung: ${ansageArme}. Beinhaltung: Beine ${ansageBeine}.`;
     }
     
@@ -471,9 +473,12 @@ async function startApp() {
     //    //let ansageBeine = selLeg.toLowerCase();
     //    phrases.start = `In Position gehen für deine Routine. Ausgangsposition: ${ansagePosition}. Armhaltung: ${ansageArme}. Beinhaltung: Beine ${ansageBeine}.`;
     //}
+
+    // --- Define custom encouragement phrases ---
     if (customEncouragements !== "") {
         encouragementPhrases = customEncouragements.split(';').map(s => s.trim()).filter(s => s !== "");
     }
+    // --- Define custom end phrase ---
     if (customEnd !== "") {
         phrases.success = customEnd;
     }
@@ -486,13 +491,15 @@ async function startApp() {
     //minP = parseInt(document.getElementById('minPenalty').value); 
     //maxP = parseInt(document.getElementById('maxPenalty').value); 
 
+    // --- Update screen visibility ---
     document.getElementById('setupScreen').style.display = 'none'; 
     document.getElementById('activeScreen').style.display = 'block';
     
     timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD; 
     initialTargetDuration = timeRemainingSeconds; 
-    updateTimerUI();
-    
+    //updateTimerUI();
+
+    // --- Initialize camera ---
     try {
         status.innerText = "Kamera-Zugriff anfordern...";
         const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -500,7 +507,8 @@ async function startApp() {
         }); 
         video.srcObject = stream;
         await video.play(); 
-        
+
+        // Wait for video element to load
         let videoCheckTimeout = setInterval(() => {
             if (video.videoWidth > 0 && video.videoHeight > 0) {
                 clearInterval(videoCheckTimeout);
