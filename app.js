@@ -459,7 +459,7 @@ async function startApp() {
     } else {
 
         // Define default start phrase
-        phrases.start = `In Position gehen für deine Routine. Ausgangsposition: ${ansagePosition}. Armhaltung: ${ansageArme}. Beinhaltung: Beine ${ansageBeine}.`;
+        phrases.start = `In Position gehen für deine Routine. Ausgangsposition: ${announcePos}. Armhaltung: ${announceArm}. Beinhaltung: Beine ${announceLeg}.`;
     }
     
     //if (customStart !== "") {
