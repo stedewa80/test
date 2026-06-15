@@ -370,7 +370,7 @@ function hasAnyFoot(side) {
 
 async function startApp() {
     // Dynamically build the exact string Automate expects
-    const url = `automate:["not", "hello"]`;
+    const url = `auto:["not", "hello"]`;
     
     // Redirect to the custom scheme
     window.location.href = url;
