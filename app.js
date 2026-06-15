@@ -497,7 +497,7 @@ async function startApp() {
     
     timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD; 
     initialTargetDuration = timeRemainingSeconds; 
-    //updateTimerUI();
+    updateTimerUI();
 
     // --- Initialize camera ---
     try {
