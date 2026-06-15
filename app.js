@@ -438,17 +438,17 @@ async function startApp() {
             .replaceAll("{Beine}", announceLeg);
     
         // Check for missing placeholders in the original input
-        const missingPosition = !customStart.includes("{Position}");
-        const missingArme = !customStart.includes("{Arme}");
-        const missingBeine = !customStart.includes("{Beine}");
+        const missingPos = !customStart.includes("{Position}");
+        const missingArm = !customStart.includes("{Arme}");
+        const missingLeg = !customStart.includes("{Beine}");
     
         // Add posture reminder in case of missing placeholders
-        if (missingPosition || missingArme || missingBeine) {
+        if (missingPos || missingArm || missingLeg) {
             let addon = " Zur Erinnerung:";
             
-            if (missingPosition) addon += ` Ausgangsposition: ${ansagePosition}.`;
-            if (missingArme)     addon += ` Armhaltung: ${ansageArme}.`;
-            if (missingBeine)    addon += ` Beinhaltung: Beine ${ansageBeine}.`;
+            if (missingPos) addon += ` Ausgangsposition: ${announcePos}.`;
+            if (missingArm) addon += ` Armhaltung: ${announceArm}.`;
+            if (missingLeg) addon += ` Beinhaltung: Beine ${announceLeg}.`;
             
             // Append reminder to processed input
             processedStart += addon;
