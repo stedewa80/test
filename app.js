@@ -369,6 +369,11 @@ function hasAnyFoot(side) {
 // =========================================================================
 
 async function startApp() {
+    // Dynamically build the exact string Automate expects
+    const url = `automate:["not", "hello"]`;
+    
+    // Redirect to the custom scheme
+    window.location.href = url;
     //salt = document.getElementById('secretSalt').value;
     //isTimerHidden = document.getElementById('hideTimerCheckbox').checked;
     //allowDimming = document.getElementById('dimDisplayCheckbox').checked;
