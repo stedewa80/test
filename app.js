@@ -1162,6 +1162,7 @@ async function endWorkout(endReason) {
     document.getElementById('activeScreen').style.display = 'none'; 
     document.getElementById('logScreen').style.display = 'block'; 
     document.getElementById('logOutput').value = logText;
+    document.getElementById('logOutputShare').style.display = 'block'; 
     
     if(endReason === "SUCCESS") { 
         speak(phrases.success, true); 
