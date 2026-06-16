@@ -551,24 +551,31 @@ async function initModelAndCountdown() {
     });
 
     // Start loop function
-    updateLoopPerformance('SETUP');
+    updateLoopPerformance('setup');
     loop();
 
     // Update screen display
-    let setupCountdown = 5;
     status.innerText = "Bereite Routine vor... ⏳"; 
     status.style.color = "#ffaa00"; 
-    
+
+    // Speak start phrase
     speak(phrases.start, true, () => {
+
+        // Wait for user to take their position
+        let setupCountdown = 5;
         status.innerText = `In Position gehen! (${setupCountdown}s)`; 
-        
+
+        // Start countdown
         let startTimer = setInterval(() => {
+            
+            // Update countdown
             setupCountdown--;
             if (setupCountdown > 0) {
                 status.innerText = `In Position gehen! (${setupCountdown}s)`;
             } else {
                 clearInterval(startTimer);
-                let result = validateHaltung(); 
+                let result = validatePosture(); 
+                // Check posture and start workout
                 if (result.valid) { 
                     initWorkout(); 
                 } else {
@@ -577,7 +584,7 @@ async function initModelAndCountdown() {
                     speak(result.msg, true);
                     
                     let retryAnchor = setInterval(() => {
-                        let check = validateHaltung(); 
+                        let check = validatePosture(); 
                         if (check.valid) { initWorkout(); clearInterval(retryAnchor); } 
                         else { status.innerText = check.msg; }
                     }, 1000);
@@ -747,7 +754,7 @@ function updatePointDOM(element, partName, containerWidth, containerHeight) {
 }
 
 function updateLoopPerformance(state) {
-    if (state === 'SETUP' || state === 'GRACE_PERIOD') {
+    if (state === 'setup' || state === 'GRACE_PERIOD') {
         currentFrameDelay = standardDelay;
         document.body.style.filter = "none";
     } 
@@ -788,7 +795,7 @@ async function checkRules() {
 
     if (isGracePeriodActive) {
         if (Date.now() >= gracePeriodEndTime) {
-            let check = validateHaltung();
+            let check = validatePosture();
             if (check.valid) { 
                 const timeStamp = new Date().toLocaleTimeString('de-DE'); 
                 logEvents.push(`[${timeStamp}] CHECKPOINT: Position erfolgreich wiederhergestellt.`); 
@@ -834,7 +841,7 @@ async function checkRules() {
     }
 
     if (globalDriftDetected) {
-        let check = validateHaltung();
+        let check = validatePosture();
         isAudioSpeakingBlock = true; 
         
         let penalty = Math.floor(Math.random() * (maxP - minP + 1)) + minP; 
@@ -856,7 +863,7 @@ async function checkRules() {
     }
 }
 
-function validateHaltung() {
+function validatePosture() {
     if (!f('left_shoulder') || !f('right_shoulder')) return { valid: false, msg: "Körper nicht im Bild" };
     const sb = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
     
