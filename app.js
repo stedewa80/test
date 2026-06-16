@@ -643,23 +643,32 @@ function initWorkout() {
     }
 
     setTimeout(() => {
+
+        // Set current keypoints as anchor points
         setNewAnchor("Wächter aktiv");
-        lastCheckpointTimestamp = Date.now() + 3000; 
-        
+        //lastCheckpointTimestamp = Date.now() + 3000; 
+
+        // Check status of workout
         workoutInterval = setInterval(() => {
+
+            // Only ...
             if (isPrepared && !appEnded) {
                 totalTimeElapsed++;
+
+                // Only ...
                 if (!isGracePeriodActive && !isAudioSpeakingBlock) { 
                     timeRemainingSeconds--; 
                     updateTimerUI(); 
                 }
-                
+
+                // Speak random encouragement phrase
                 if (!isGracePeriodActive && !isAudioSpeakingBlock && Date.now() >= nextEncouragementTimestamp) {
                     let randomPhrase = encouragementPhrases[Math.floor(Math.random() * encouragementPhrases.length)];
                     speak(randomPhrase, false);
                     nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
                 }
 
+                // End workout if time is over or cap is reached
                 if (totalTimeElapsed >= capD || timeRemainingSeconds <= 0) { 
                     endWorkout(totalTimeElapsed >= capD ? "CAP_REACHED" : "SUCCESS"); 
                 }
