@@ -574,18 +574,22 @@ async function initModelAndCountdown() {
                 status.innerText = `In Position gehen! (${setupCountdown}s)`;
             } else {
                 clearInterval(startTimer);
-                let result = validatePosture(); 
+
                 // Check posture and start workout
+                let result = validatePosture(); 
                 if (result.valid) { 
                     initWorkout(); 
+                    
                 } else {
+                    // Update screen display
                     status.innerText = result.msg; 
                     status.style.color = "#ff3333"; 
                     speak(result.msg, true);
-                    
-                    let retryAnchor = setInterval(() => {
+
+                    // Check posture and start workout
+                    let checkPosture = setInterval(() => {
                         let check = validatePosture(); 
-                        if (check.valid) { initWorkout(); clearInterval(retryAnchor); } 
+                        if (check.valid) { initWorkout(); clearInterval(checkPosture); } 
                         else { status.innerText = check.msg; }
                     }, 1000);
                 }
@@ -594,12 +598,17 @@ async function initModelAndCountdown() {
     });
 }
 
+// --- Initialze workout ---
 function initWorkout() {
+    
+    // Set start time
     realStartTimestamp = Date.now(); 
     startTimeStr = new Date(realStartTimestamp).toLocaleString('de-DE');
     nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
     
     if (Object.keys(latestKeypoints).length > 0) {
+
+        // Find bounding box for keypoints 
         let minX = 257, maxX = 0, minY = 257, maxY = 0, validPoints = 0;
         for (let kp in latestKeypoints) {
             if (latestKeypoints[kp].score > 0.4) {
@@ -610,6 +619,8 @@ function initWorkout() {
                 validPoints++;
             }
         }
+
+        // Zoom and center on the user
         if (validPoints > 4) {
             let boxW = (maxX - minX); let boxH = (maxY - minY);
             let cx = minX + (boxW / 2); let cy = minY + (boxH / 2);
