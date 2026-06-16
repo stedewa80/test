@@ -423,6 +423,16 @@ async function startApp() {
         salt = document.getElementById('secretSalt').value;
     }
 
+    // --- Calculate initial duration ---
+    timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD; 
+    initialTargetDuration = timeRemainingSeconds;
+
+    // --- Calculate frame rates and delays ---
+    standardDelay = Math.round(1000 / standardFPS);
+    increasedDelay = Math.round(1000 / reducedFPS);
+    aiCheckInterval = Math.round(1000 / aicheckFPS);
+    currentFrameDelay = standardDelay;
+
     // --- Define posture announcements ---
     let announcePos = selPos.replace("_", " ").toLowerCase();
     let announceArm = selArm.replace("_", " ").toLowerCase();
@@ -483,10 +493,10 @@ async function startApp() {
         phrases.success = customEnd;
     }
 
-    standardDelay = Math.round(1000 / standardFPS);
-    increasedDelay = Math.round(1000 / reducedFPS);
-    aiCheckInterval = Math.round(1000 / aicheckFPS);
-    currentFrameDelay = standardDelay;
+    //standardDelay = Math.round(1000 / standardFPS);
+    //increasedDelay = Math.round(1000 / reducedFPS);
+    //aiCheckInterval = Math.round(1000 / aicheckFPS);
+    //currentFrameDelay = standardDelay;
     
     //minP = parseInt(document.getElementById('minPenalty').value); 
     //maxP = parseInt(document.getElementById('maxPenalty').value); 
@@ -494,11 +504,11 @@ async function startApp() {
     // --- Update screen visibility ---
     document.getElementById('setupScreen').style.display = 'none'; 
     document.getElementById('activeScreen').style.display = 'block';
-    
-    timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD; 
-    initialTargetDuration = timeRemainingSeconds; 
-    //updateTimerUI();
     timerDisplay.innerText = "••:••";
+    //updateTimerUI();
+    
+    //timeRemainingSeconds = Math.floor(Math.random() * (maxD - minD + 1)) + minD; 
+    //initialTargetDuration = timeRemainingSeconds; 
 
     // --- Initialize camera ---
     try {
@@ -518,6 +528,7 @@ async function startApp() {
         }, 100);
 
     } catch(e) { 
+        // Error message
         status.innerText = "Kamerafehler! " + e.message; 
         status.style.color = "red"; 
         console.error(e); 
