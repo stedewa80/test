@@ -535,19 +535,26 @@ async function startApp() {
     }
 }
 
+// --- Initialize model and start countdown ---
 async function initModelAndCountdown() {
+
+    // Set screen wake lock
     try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { }
-    
+
+    // Update screen display
     status.innerText = "Lade MediaPipe-Modell...";
     status.style.color = "#ffaa00";
-    
+
+    // Load MediaPipe model
     detector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, { 
         runtime: 'mediapipe', modelType: 'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/' 
     });
-    
+
+    // Start loop function
     updateLoopPerformance('SETUP');
     loop();
-    
+
+    // Update screen display
     let setupCountdown = 5;
     status.innerText = "Bereite Routine vor... ⏳"; 
     status.style.color = "#ffaa00"; 
