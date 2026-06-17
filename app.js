@@ -1243,6 +1243,7 @@ function showVerificationOption() {
     document.getElementById('buddyVerifyBox').style.display = 'block'; 
 }
 
+// --- Verify pasted log ---
 async function verifyPastedLog() {
     const rawInput = document.getElementById('logOutput').value; 
     const saltCheck = document.getElementById('secretSalt').value; 
