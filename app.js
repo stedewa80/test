@@ -986,27 +986,34 @@ function triggerVisualGracePeriod() {
     }, 1000);
 }
 
+// Set new keypoints anchor
 function setNewAnchor(audioMessage) {
     anchorPose = {};
+    // Calculate base shoulderwidth
     if (f('left_shoulder') && f('right_shoulder')) {
         baseShoulderWidth = Math.sqrt(Math.pow(latestKeypoints.left_shoulder.x - latestKeypoints.right_shoulder.x, 2) + Math.pow(latestKeypoints.left_shoulder.y - latestKeypoints.right_shoulder.y, 2));
     }
+    // Setctracking list with coordinatos of each key point 
     const trackingList = ['left_shoulder', 'right_shoulder', 'left_ear', 'right_ear', 'left_hip', 'right_hip', 'left_knee', 'right_knee', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist', 'left_heel', 'right_heel', 'left_foot_index', 'right_foot_index'];
     trackingList.forEach(j => { if (f(j)) anchorPose[j] = { x: latestKeypoints[j].x, y: latestKeypoints[j].y }; });
-    
+
+    // Set system stares and variables
     isPrepared = true; 
     isGracePeriodActive = false; 
     isAudioSpeakingBlock = false; 
     remainingSecondsCounter = 3; 
     lastCheckpointTimestamp = Date.now();
-    
+
+    // Update screen output
     status.innerText = "Überwachung aktiv! 🟢"; 
     status.style.color = "#00ffcc"; 
     timerDisplay.style.color = "#ffffff"; 
     container.style.borderColor = "#333333";
-    
+
+    // Update loop performance
     updateLoopPerformance('STILLNESS');
-    
+
+    // Speech output
     if (audioMessage) speak(audioMessage, true);
 }
 
@@ -1014,11 +1021,14 @@ function setNewAnchor(audioMessage) {
 // 8. DATA EXPORT, PARSING & ROUTINE SHARING CONFIGURATIONS
 // =========================================================================
 
+// Set routine with predefined variables
 async function generateRoutineString() {
     try {
+        // Read secret
         const secret = document.getElementById('secretSalt').value.trim();
         if (!secret) { alert("Bitte gib zuerst ein Passwort (Salt) ein!"); return; }
 
+        // Read variables
         const routineData = {
             selPos: document.getElementById('positionSelect').value, 
             selArm: document.getElementById('armSelect').value, 
@@ -1054,15 +1064,18 @@ async function generateRoutineString() {
             //cEnd: document.getElementById('customEndInput').value.trim()
         //};
 
+        // Encrypt routine
         const rawJson = JSON.stringify(routineData);
 
         const jsonBytes = new TextEncoder().encode(rawJson);
         const binaryString = String.fromCharCode(...jsonBytes);
         const base64Payload = btoa(binaryString);
 
+        // Calculate signature
         const signature = await generateHMAC(rawJson, secret);
         const sharePayload = base64Payload + "::" + signature;
-        
+
+        // Share routine using WhatsApp
         const textMessage = `Hier ist deine geheime Cornertime-Routine:\n\n${sharePayload}`;
         const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(textMessage)}`;
         
@@ -1074,21 +1087,27 @@ async function generateRoutineString() {
     } catch(e) { alert("Fehler beim Erstellen der Routine: " + e.message); }
 }
 
+// --- Load routine with predefined variables
 async function loadImportedRoutine(payload) {
     try {
+        // Read imported routine
         const parts = payload.split("::");
         if (parts.length !== 2) return false;
-        
+
+        // Read secret
         const secret = document.getElementById('secretSalt').value.trim();
         if (!secret) { alert("Bitte gib das passende Passwort ein, um die Routine zu entschlüsseln!"); return false; }
 
+        // Decode
+        routine
         const binaryString = atob(parts[0]);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
             bytes[i] = binaryString.charCodeAt(i);
         }
         const decodedJson = new TextDecoder().decode(bytes);
-        
+
+        // Calculte signature and compare to provided signature
         const computedSig = await generateHMAC(decodedJson, secret);
         if (computedSig !== parts[1]) { 
             alert("Ungültige Signatur! Falsches Passwort oder manipulierte Routine."); 
@@ -1108,7 +1127,8 @@ async function loadImportedRoutine(payload) {
         //if (computedSig !== parts[1]) { alert("Ungültige Signatur! Falsches Passwort oder manipulierte Routine."); return false; }
         
         //const routine = JSON.parse(decodedJson);
-        
+
+        // Read variables
         selPos = routine.selPos; selArm = routine.selArm; selLeg = routine.selLeg;
         minD = routine.minD; maxD = routine.maxD; capD = routine.capD;
         minP = routine.minP || 5; maxP = routine.maxP || 10;
@@ -1119,6 +1139,7 @@ async function loadImportedRoutine(payload) {
         isDisplayDim = routine.isDisplayDim;
         salt = routine.salt;
 
+        // Update variables on website
         document.getElementById('positionSelect').value = selPos; 
         document.getElementById('armSelect').value = selArm; 
         document.getElementById('legSelect').value = selLeg;
@@ -1153,6 +1174,7 @@ async function loadImportedRoutine(payload) {
         //document.getElementById('customEncouragementInput').value = routine.cMotiv || "";
         //document.getElementById('customEndInput').value = routine.cEnd || "";
 
+        // Update phrases for speech output
         if (routine.cStart && routine.cStart.trim() !== "") phrases.start = routine.cStart;
         if (routine.cEnd && routine.cEnd.trim() !== "") phrases.success = routine.cEnd;
         if (routine.cMotiv && routine.cMotiv.trim() !== "") {
@@ -1171,9 +1193,7 @@ async function loadImportedRoutine(payload) {
 // 9. METRICS CRYPTOGRAPHIC VERIFICATION & DATA SIGNING
 // =========================================================================
 
-/**
- * Generates a SHA-256 HMAC signature for a given string using a shared secret key.
- */
+// --- Generates a SHA-256 HMAC signature for a given string using a shared secret key ---
 async function generateHMAC(text, secret) {
     const encoder = new TextEncoder(); 
     const keyData = encoder.encode(secret); 
@@ -1184,18 +1204,27 @@ async function generateHMAC(text, secret) {
 }
 
 async function endWorkout(endReason) {
+
+    // Set state variables
     appEnded = true; 
     clearInterval(workoutInterval); 
     isPrepared = false; 
+
+    // Remove wakelock
     if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
 
+    // Set screen visibility/brightness
     document.body.style.filter = "none";
-    
+
+    // Calculate end time and duration
     const endTimestamp = Date.now(); 
     const endTimeStr = new Date(endTimestamp).toLocaleString('de-DE');
-    let statusText = endReason === "SUCCESS" ? "Erfolgreich beendet (Uhr auf 0)" : "MAXIMAL-DAUER ERREICHT (Deckel gegriffen)";
     let realEffectiveSeconds = Math.round((endTimestamp - realStartTimestamp) / 1000);
 
+    // Check ending condition
+    let statusText = endReason === "SUCCESS" ? "Erfolgreich beendet (Uhr auf 0)" : "MAXIMAL-DAUER ERREICHT (Deckel gegriffen)";
+
+    // Write logfile
     let logText = `=== CORNERTIME WÄCHTER REPORT ===\n`; 
     logText += `Position: ${selPos}\nArmhaltung: ${selArm}\nBeinhaltung: ${selLeg}\n\n`;
     logText += `GEPLANTE DAUER: ${formatTime(initialTargetDuration)} (Bereich: ${minD}-${maxD}s)\n`; 
@@ -1209,30 +1238,34 @@ async function endWorkout(endReason) {
     logText += `Gesamtzahl Strafen: ${totalPenaltiesCount}\n`; 
     logText += `Gesamte Strafzeit:  +${totalPenaltySecondsSum} Sekunden\n`; 
     logText += `=================================\n`;
-    
+
+    // Calculate hash for later verification
     const hash = await generateHMAC(logText, salt); 
     logText += `SIGNATUR: ${hash}\n`;
-    
+
+    // Set screen visibility
     document.getElementById('activeScreen').style.display = 'none'; 
     document.getElementById('logScreen').style.display = 'block'; 
     document.getElementById('logOutput').value = logText;
     document.getElementById('logOutputShare').style.display = 'block'; 
-    
+
+    // Speech output
     if(endReason === "SUCCESS") { 
         speak(phrases.success, true); 
         
-        if (llamaLabEndpoint && llamaLabEndpoint.trim() !== "") {
-            fetch(llamaLabEndpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: "SUCCESS", signature: hash })
-            }).catch(err => console.error("LlamaLab Webhook communication failure:", err));
-        }
+        //if (llamaLabEndpoint && llamaLabEndpoint.trim() !== "") {
+        //    fetch(llamaLabEndpoint, {
+        //        method: 'POST',
+        //        headers: { 'Content-Type': 'application/json' },
+        //        body: JSON.stringify({ status: "SUCCESS", signature: hash })
+        //    }).catch(err => console.error("LlamaLab Webhook communication failure:", err));
+        //}
     } else { 
         speak(phrases.capReached, true); 
     }
 }
 
+// --- Show verification dialog ---
 function showVerificationOption() { 
     document.getElementById('setupScreen').style.display = 'none'; 
     document.getElementById('logScreen').style.display = 'block'; 
