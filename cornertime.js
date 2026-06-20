@@ -157,9 +157,19 @@ async function initModel() {
 // --- Initialize model and start countdown ---
 async function initModelAndCountdown() {
 
+        isGracePeriodActive = true;
+        let localCounter = 3;
+        gracePeriodEndTime = Date.now() + 3200; 
+    
         // Wait for user to take their position
         let setupCountdown = 5;
         status.innerText = `In Position gehen! (${setupCountdown}s)`; 
+        
+        status.innerText = `KORREKTURZEIT! Noch ${localCounter}s... ⏳`;
+        status.style.color = "#ffaa00";
+        container.style.borderColor = "#ffaa00";
+        if(!isTimerHidden) timerDisplay.style.color = "#ffaa00";
+        speak(localCounter.toString(), false);
 
         // Start countdown
         let startTimer = setInterval(() => {
@@ -168,6 +178,9 @@ async function initModelAndCountdown() {
             setupCountdown--;
             if (setupCountdown > 0) {
                 status.innerText = `In Position gehen! (${setupCountdown}s)`;
+                
+                status.innerText = `KORREKTURZEIT! Noch ${localCounter}s... ⏳`;
+            speak(localCounter.toString(), false);
             } else {
                 clearInterval(startTimer);
 
@@ -192,4 +205,26 @@ async function initModelAndCountdown() {
             }
         }, 1000);
     });
+}
+
+function triggerVisualGracePeriod() {
+    isGracePeriodActive = true;
+    let localCounter = 3;
+    gracePeriodEndTime = Date.now() + 3200; 
+    
+    status.innerText = `KORREKTURZEIT! Noch ${localCounter}s... ⏳`;
+    status.style.color = "#ffaa00";
+    container.style.borderColor = "#ffaa00";
+    if(!isTimerHidden) timerDisplay.style.color = "#ffaa00";
+    speak(localCounter.toString(), false);
+
+    let graceTimer = setInterval(() => {
+        localCounter--;
+        if (localCounter > 0 && isGracePeriodActive) {
+            status.innerText = `KORREKTURZEIT! Noch ${localCounter}s... ⏳`;
+            speak(localCounter.toString(), false);
+        } else {
+            clearInterval(graceTimer);
+        }
+    }, 1000);
 }
