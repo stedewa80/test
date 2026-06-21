@@ -155,28 +155,31 @@ async function initModel() {
 }
 
 // --- Initialize model and start countdown ---
-async function initModelAndCountdown() {
+async function initCountdown(isSetup = true) {
 
-        isGracePeriodActive = true;
-        let localCounter = 3;
-        gracePeriodEndTime = Date.now() + 3200; 
-    
-        // Wait for user to take their position
-        let setupCountdown = 5;
-        status.innerText = `In Position gehen! (${setupCountdown}s)`; 
-        
-        status.innerText = `KORREKTURZEIT! Noch ${localCounter}s... ⏳`;
-        status.style.color = "#ffaa00";
-        container.style.borderColor = "#ffaa00";
-        if(!isTimerHidden) timerDisplay.style.color = "#ffaa00";
-        speak(localCounter.toString(), false);
+        if (!isSetup){
+            isGracePeriodActive = true;
+            gracePeriodEndTime = Date.now() + 3200; 
+            let localCountdown = 3;
+            const innerText = `KORREKTURZEIT! `;
+            status.style.color = "#ffaa00";
+            container.style.borderColor = "#ffaa00";
+            if(!isTimerHidden) timerDisplay.style.color = "#ffaa00";
+        } else {
+            // Wait for user to take their position
+            let localCountdown = 5;
+            const innerText = `In Position gehen! `;
+        }
+
+        status.innerText = innerText `Noch ${localCountdown}s... ⏳`;
+        speak(localCountdown.toString(), false);
 
         // Start countdown
         let startTimer = setInterval(() => {
             
             // Update countdown
-            setupCountdown--;
-            if (setupCountdown > 0) {
+            localCountdown--;
+            if (localCountdown > 0) {
                 status.innerText = `In Position gehen! (${setupCountdown}s)`;
                 
                 status.innerText = `KORREKTURZEIT! Noch ${localCounter}s... ⏳`;
