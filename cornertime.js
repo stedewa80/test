@@ -106,6 +106,9 @@ async function startApp() {
     // Speak start phrase
     speak(phrases.start, true, () => {
     });
+
+    // Initialize countdown
+    initCountdown(true);
 }
 
 // --- Initialize camera ---
@@ -156,22 +159,25 @@ async function initModel() {
 
 // --- Initialize model and start countdown ---
 async function initCountdown(isSetup = true) {
-
+        
+        let localclCountdown;
+        const = innerText;
+    
         if (!isSetup){
             isGracePeriodActive = true;
             gracePeriodEndTime = Date.now() + 3200; 
-            let localCountdown = 3;
-            const innerText = `KORREKTURZEIT! `;
+            localCountdown = 3;
+            innerText = `KORREKTURZEIT! `;
             status.style.color = "#ffaa00";
             container.style.borderColor = "#ffaa00";
             if(!isTimerHidden) timerDisplay.style.color = "#ffaa00";
         } else {
             // Wait for user to take their position
-            let localCountdown = 5;
-            const innerText = `In Position gehen! `;
+            localCountdown = 5;
+            innerText = `In Position gehen! `;
         }
 
-        status.innerText = innerText `Noch ${localCountdown}s... ⏳`;
+        status.innerText = innerText + `Noch ${localCountdown}s... ⏳`;
         speak(localCountdown.toString(), false);
 
         // Start countdown
@@ -180,35 +186,34 @@ async function initCountdown(isSetup = true) {
             // Update countdown
             localCountdown--;
             if (localCountdown > 0) {
-                status.innerText = `In Position gehen! (${setupCountdown}s)`;
-                
-                status.innerText = `KORREKTURZEIT! Noch ${localCounter}s... ⏳`;
-            speak(localCounter.toString(), false);
+                status.innerText = innerText + `Noch ${localCountdown}s... ⏳`;
+                speak(localCountdown.toString(), false);
             } else {
                 clearInterval(startTimer);
 
-                // Check posture and start workout
-                let result = validatePosture(); 
-                if (result.valid) { 
-                    initWorkout(); 
-                    
-                } else {
-                    // Update screen display
-                    status.innerText = result.msg; 
-                    status.style.color = "#ff3333"; 
-                    speak(result.msg, true);
-
+                if (!isSetup){
                     // Check posture and start workout
-                    let checkPosture = setInterval(() => {
+                    let result = validatePosture(); 
+                    if (result.valid) { 
+                        initWorkout(); 
+                    
+                    } else {
+                        // Update screen display
+                        status.innerText = result.msg; 
+                        status.style.color = "#ff3333"; 
+                        speak(result.msg, true);
+
+                        // Check posture and start workout
+                        let checkPosture = setInterval(() => {
                         let check = validatePosture(); 
                         if (check.valid) { initWorkout(); clearInterval(checkPosture); } 
                         else { status.innerText = check.msg; }
-                    }, 1000);
+                        }, 1000);
+                    }
                 }
             }
         }, 1000);
     });
-}
 
 function triggerVisualGracePeriod() {
     isGracePeriodActive = true;
