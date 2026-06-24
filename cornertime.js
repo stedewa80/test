@@ -236,3 +236,81 @@ function triggerVisualGracePeriod() {
         }
     }, 1000);
 }
+
+function initWorkout() {
+    
+    // Set start time
+    realStartTimestamp = Date.now(); 
+    startTimeStr = new Date(realStartTimestamp).toLocaleString('de-DE');
+    nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
+    
+    if (Object.keys(latestKeypoints).length > 0) {
+
+        // Find bounding box for keypoints 
+        let minX = 257, maxX = 0, minY = 257, maxY = 0, validPoints = 0;
+        for (let kp in latestKeypoints) {
+            if (latestKeypoints[kp].score > 0.4) {
+                let kpX = 257 - latestKeypoints[kp].x; 
+                let kpY = latestKeypoints[kp].y;
+                if(kpX < minX) minX = kpX; if(kpX > maxX) maxX = kpX;
+                if(kpY < minY) minY = kpY; if(kpY > maxY) maxY = kpY;
+                validPoints++;
+            }
+        }
+
+        // Zoom and center on the user
+        if (validPoints > 4) {
+            let boxW = (maxX - minX); let boxH = (maxY - minY);
+            let cx = minX + (boxW / 2); let cy = minY + (boxH / 2);
+            let size = Math.max(boxW, boxH) * 1.35; 
+            
+            let videoMinDim = Math.min(video.videoWidth, video.videoHeight);
+            let scaleFactor = videoMinDim / 257;
+            let sWidth = Math.min(videoMinDim, size * scaleFactor);
+            
+            let videoLeftOffset = (video.videoWidth - videoMinDim) / 2;
+            let videoTopOffset = (video.videoHeight - videoMinDim) / 2;
+            
+            staticZoomCoords = {
+                sx: Math.max(videoLeftOffset, Math.min(video.videoWidth - sWidth - videoLeftOffset, videoLeftOffset + (cx * scaleFactor) - (sWidth / 2))),
+                sy: Math.max(videoTopOffset, Math.min(video.videoHeight - sWidth - videoTopOffset, videoTopOffset + (cy * scaleFactor) - (sWidth / 2))),
+                sWidth: sWidth,
+                sHeight: sWidth
+            };
+        }
+    }
+
+    setTimeout(() => {
+
+        // Set current keypoints as anchor points
+        setNewAnchor("Wächter aktiv");
+        //lastCheckpointTimestamp = Date.now() + 3000; 
+
+        // Check status of workout
+        workoutInterval = setInterval(() => {
+
+            // Only ...
+            if (isPrepared && !appEnded) {
+                totalTimeElapsed++;
+
+                // Only ...
+                if (!isGracePeriodActive && !isAudioSpeakingBlock) { 
+                    timeRemainingSeconds--; 
+                    updateTimerUI(); 
+                }
+
+                // Speak random encouragement phrase
+                if (!isGracePeriodActive && !isAudioSpeakingBlock && Date.now() >= nextEncouragementTimestamp) {
+                    let randomPhrase = encouragementPhrases[Math.floor(Math.random() * encouragementPhrases.length)];
+                    speak(randomPhrase, false);
+                    nextEncouragementTimestamp = Date.now() + (Math.floor(Math.random() * (maxEncouragementInterval - minEncouragementInterval + 1)) + minEncouragementInterval) * 1000;
+                }
+
+                // End workout if time is over or cap is reached
+                if (totalTimeElapsed >= capD || timeRemainingSeconds <= 0) { 
+                    endWorkout(totalTimeElapsed >= capD ? "CAP_REACHED" : "SUCCESS"); 
+                }
+            }
+        }, 1000);
+    }, 1500); 
+}
