@@ -523,7 +523,7 @@ async function startApp() {
         let videoCheckTimeout = setInterval(() => {
             if (video.videoWidth > 0 && video.videoHeight > 0) {
                 clearInterval(videoCheckTimeout);
-                window.location.href = 'automate:["not",""]';
+                //window.location.href = 'automate:["not",""]';
                 initModelAndCountdown();
             }
         }, 100);
