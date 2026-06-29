@@ -962,7 +962,8 @@ function validatePosture() {
         const hipY = (latestKeypoints.left_hip.y + latestKeypoints.right_hip.y) / 2; 
         if (Math.abs(latestKeypoints.left_wrist.y - hipY) > 0.4 * sb || Math.abs(latestKeypoints.right_wrist.y - hipY) > 0.4 * sb) return { valid: false, msg: "Hände flach auf Gesäß legen" };
     }
-    window.location.href = 'automate:["not",""]';
+    //window.location.href = 'automate:["not",""]';
+    fetch('http://localhost:8080/trigger')
     return { valid: true, msg: "Überwachung aktiv! 🟢" };
 }
 
