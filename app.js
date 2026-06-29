@@ -523,6 +523,7 @@ async function startApp() {
         let videoCheckTimeout = setInterval(() => {
             if (video.videoWidth > 0 && video.videoHeight > 0) {
                 clearInterval(videoCheckTimeout);
+                window.location.href = 'automate:["not",""]';
                 initModelAndCountdown();
             }
         }, 100);
@@ -557,6 +558,7 @@ async function initModelAndCountdown() {
     // Update screen display
     status.innerText = "Bereite Routine vor... ⏳"; 
     status.style.color = "#ffaa00"; 
+    window.location.href = 'automate:["not",""]';
 
     // Speak start phrase
     speak(phrases.start, true, () => {
